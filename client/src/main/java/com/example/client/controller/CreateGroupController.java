@@ -18,8 +18,12 @@ public class CreateGroupController {
     public void initialize() {
         // Load danh sách bạn bè để chọn (Lấy từ MainController hoặc gọi lại RMI)
         friendCheckList.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+        // --- THÊM ĐOẠN NÀY: Tùy biến giao diện dòng để có CheckBox ---
+        friendCheckList.setCellFactory(param -> new FriendListCell());
+        // -------------------------------------------------------------
         loadFriends();
     }
+
 
     private void loadFriends() {
         new Thread(() -> {

@@ -175,7 +175,13 @@ public class MainController {
             Stage stage = new Stage();
             stage.setTitle("Tạo Nhóm");
             stage.setScene(new Scene(root));
-            stage.show();
+
+            // SỬA THÀNH showAndWait (Chờ cửa sổ đóng mới chạy tiếp)
+            stage.showAndWait();
+
+            // Sau khi đóng cửa sổ tạo nhóm -> Tải lại danh sách ngay
+            loadFriendListInitial();
+
         } catch (Exception e) { e.printStackTrace(); }
     }
 

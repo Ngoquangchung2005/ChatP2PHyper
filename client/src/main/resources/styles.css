@@ -45,3 +45,8 @@
 .btn-link:hover {
     -fx-underline: true;
 }
+.check-box {
+    -fx-padding: 5;
+    -fx-font-size: 14px;
+    -fx-cursor: hand;
+}
