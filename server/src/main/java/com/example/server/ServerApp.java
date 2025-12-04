@@ -1,11 +1,10 @@
 package com.example.server;
 
 import com.example.server.config.Database;
-import com.example.server.service.AuthServiceImpl;
+import com.example.server.service.*;
+
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
-import com.example.server.service.ChatServiceImpl;
-import com.example.server.service.GroupServiceImpl;
 
 public class ServerApp {
     public static void main(String[] args) {
@@ -18,11 +17,14 @@ public class ServerApp {
             int port = Database.getRmiPort();
             Registry registry = LocateRegistry.createRegistry(port);
 
-            // 3. Đăng ký các dịch vụ (Services)
-            // Bước này mới chỉ có AuthService, bước sau ta sẽ thêm ChatService
+            // Đăng ký các dịch vụ đã tách nhỏ
             registry.rebind("AuthService", new AuthServiceImpl());
-            registry.rebind("ChatService", new ChatServiceImpl());
             registry.rebind("GroupService", new GroupServiceImpl());
+
+            // 3 SERVICE MỚI
+            registry.rebind("FriendService", new FriendServiceImpl());
+            registry.rebind("MessageService", new MessageServiceImpl());
+            registry.rebind("DirectoryService", new DirectoryServiceImpl());
 
             System.out.println("Server đang chạy tại port: " + port);
 

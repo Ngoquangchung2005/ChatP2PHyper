@@ -34,8 +34,7 @@ public class MainController {
 
     private P2PClient p2pClient;
     private UserDTO currentChatUser;
-
-    // Giữ tham chiếu Callback để tránh bị Garbage Collector dọn mất
+    private long activeConversationId = -1;
     private ClientCallback myCallback;
 
     @FXML
@@ -43,89 +42,54 @@ public class MainController {
         UserDTO me = SessionStore.currentUser;
         if (me != null) {
             myDisplayName.setText(me.getDisplayName());
-
-            // 1. Khởi động P2P Server (Lắng nghe tin nhắn trực tiếp)
             startP2P();
-
-            // 2. Tải danh sách bạn bè/nhóm lần đầu
             loadFriendListInitial();
-
-            // 3. Đăng ký nhận thông báo Real-time (Cơ chế Callback)
             registerRealTimeUpdates();
         }
 
-        // Sự kiện chọn bạn để chat
         conversationList.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null) switchChat(newVal);
         });
     }
 
-    // --- CƠ CHẾ REAL-TIME: SERVER GỌI VỀ CLIENT ---
     private void registerRealTimeUpdates() {
         try {
-            // Định nghĩa hành động khi Server báo tin: Cập nhật giao diện
             myCallback = new ClientCallback() {
                 @Override
                 public void onFriendStatusChange(UserDTO friend) throws RemoteException {
-                    // Cập nhật UI bắt buộc phải chạy trên luồng JavaFX
                     Platform.runLater(() -> updateFriendInList(friend));
                 }
             };
-
-            // Export object này ra cổng ngẫu nhiên (0) để Server có thể gọi tới
             UnicastRemoteObject.exportObject(myCallback, 0);
-
-            // Gửi "cái loa" này lên Server
             RmiClient.getAuthService().registerNotification(SessionStore.currentUser.getId(), myCallback);
-            System.out.println("Đã đăng ký nhận thông báo Real-time với Server.");
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            System.err.println("Lỗi đăng ký Real-time: " + e.getMessage());
-        }
+        } catch (Exception e) { e.printStackTrace(); }
     }
 
-    // Hàm cập nhật danh sách thông minh (Không load lại toàn bộ gây lag)
     private void updateFriendInList(UserDTO updatedFriend) {
         boolean found = false;
-
-        // 1. Tìm xem người này (hoặc nhóm này) có trong list chưa
         for (UserDTO u : conversationList.getItems()) {
             if (u.getId() == updatedFriend.getId()) {
-                // Có rồi -> Cập nhật trạng thái
                 u.setOnline(updatedFriend.isOnline());
                 u.setLastIp(updatedFriend.getLastIp());
                 u.setLastPort(updatedFriend.getLastPort());
-                // Nếu là nhóm thì có thể cập nhật tên nhóm nếu đổi (tùy logic Server)
                 found = true;
                 break;
             }
         }
-
-        // 2. Nếu chưa có -> Thêm vào ĐẦU danh sách
-        if (!found) {
-            conversationList.getItems().add(0, updatedFriend);
-        }
-
-        // 3. Refresh lại ListView để hiển thị (chấm xanh/xám)
+        if (!found) conversationList.getItems().add(0, updatedFriend);
         conversationList.refresh();
     }
-
-    // --- CÁC CHỨC NĂNG CHÍNH ---
 
     private void loadFriendListInitial() {
         new Thread(() -> {
             try {
-                // Gọi RMI lấy danh sách bạn bè và nhóm
-                List<UserDTO> friends = RmiClient.getChatService().getFriendList(SessionStore.currentUser.getId());
-
+                // SỬA: Dùng FriendService
+                List<UserDTO> friends = RmiClient.getFriendService().getFriendList(SessionStore.currentUser.getId());
                 Platform.runLater(() -> {
                     conversationList.getItems().clear();
                     conversationList.getItems().addAll(friends);
                 });
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+            } catch (Exception e) { e.printStackTrace(); }
         }).start();
     }
 
@@ -134,37 +98,40 @@ public class MainController {
         p2pClient.start();
     }
 
-    private void switchChat(UserDTO friend) {
-        this.currentChatUser = friend;
+    private void switchChat(UserDTO friendOrGroup) {
+        this.currentChatUser = friendOrGroup;
         welcomeArea.setVisible(false);
         chatArea.setVisible(true);
-        currentChatTitle.setText(friend.getDisplayName());
+        currentChatTitle.setText(friendOrGroup.getDisplayName());
         msgContainer.getChildren().clear();
 
-        loadHistory();
-    }
-
-    private void loadHistory() {
         new Thread(() -> {
             try {
-                // Tạm thời fix conversation ID = 1 nếu chưa xử lý logic chọn conversation chuẩn
-                // Trong thực tế: conversationId nên được lấy từ UserDTO (nếu là nhóm) hoặc tìm trong DB (nếu là chat đôi)
-                // Ở đây ta giả định currentChatUser.getId() chính là conversationId cho Nhóm,
-                // còn Chat đôi thì cần logic getConversationId(userId1, userId2).
-                // ĐỂ TEST ĐƠN GIẢN: Ta dùng luôn id của bạn bè làm conversationId tạm thời.
-                long conversationId = currentChatUser.getId();
-
-                List<MessageDTO> history = RmiClient.getChatService().getHistory(conversationId);
-
-                Platform.runLater(() -> {
-                    for (MessageDTO msg : history) {
-                        boolean isMe = msg.getSenderId() == SessionStore.currentUser.getId();
-                        addMessageBubble(msg.getContent(), isMe);
-                    }
-                    msgScrollPane.setVvalue(1.0); // Cuộn xuống cuối
-                });
+                if ("GROUP".equals(friendOrGroup.getUsername())) {
+                    activeConversationId = friendOrGroup.getId();
+                } else {
+                    // SỬA: Dùng MessageService để lấy ID
+                    activeConversationId = RmiClient.getMessageService()
+                            .getPrivateConversationId(SessionStore.currentUser.getId(), friendOrGroup.getId());
+                }
+                loadHistory(activeConversationId);
             } catch (Exception e) { e.printStackTrace(); }
         }).start();
+    }
+
+    private void loadHistory(long conversationId) {
+        try {
+            // SỬA: Dùng MessageService để lấy lịch sử
+            List<MessageDTO> history = RmiClient.getMessageService().getHistory(conversationId);
+            Platform.runLater(() -> {
+                msgContainer.getChildren().clear();
+                for (MessageDTO msg : history) {
+                    boolean isMe = msg.getSenderId() == SessionStore.currentUser.getId();
+                    addMessageBubble(msg.getContent(), isMe);
+                }
+                msgScrollPane.setVvalue(1.0);
+            });
+        } catch (Exception e) { e.printStackTrace(); }
     }
 
     @FXML
@@ -175,87 +142,82 @@ public class MainController {
             Stage stage = new Stage();
             stage.setTitle("Tạo Nhóm");
             stage.setScene(new Scene(root));
-
-            // SỬA THÀNH showAndWait (Chờ cửa sổ đóng mới chạy tiếp)
             stage.showAndWait();
-
-            // Sau khi đóng cửa sổ tạo nhóm -> Tải lại danh sách ngay
             loadFriendListInitial();
+        } catch (Exception e) { e.printStackTrace(); }
+    }
 
+    @FXML
+    public void handleAddFriend() {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/view/add-friend.fxml"));
+            Parent root = loader.load();
+            Stage stage = new Stage();
+            stage.setTitle("Thêm bạn bè");
+            stage.setScene(new Scene(root));
+            stage.showAndWait();
+            loadFriendListInitial();
         } catch (Exception e) { e.printStackTrace(); }
     }
 
     @FXML
     public void handleSend() {
         String text = inputField.getText().trim();
-        if (text.isEmpty() || currentChatUser == null) return;
+        if (text.isEmpty() || currentChatUser == null || activeConversationId == -1) return;
 
         MessageDTO msg = new MessageDTO();
         msg.setSenderId(SessionStore.currentUser.getId());
         msg.setContent(text);
         msg.setCreatedAt(LocalDateTime.now());
         msg.setSenderName(SessionStore.currentUser.getDisplayName());
+        msg.setConversationId(activeConversationId);
 
-        // Quan trọng: Gán ID hội thoại
-        msg.setConversationId(currentChatUser.getId());
-
-        // Kiểm tra xem đang gửi cho NHÓM hay NGƯỜI
-        // (Server trả về nhóm với username="GROUP")
         boolean isGroup = "GROUP".equals(currentChatUser.getUsername());
 
-        // 1. GỬI P2P (HYBRID)
         new Thread(() -> {
             try {
                 if (isGroup) {
-                    // -- CHAT NHÓM --
-                    // Lấy danh sách thành viên
-                    List<Long> memberIds = RmiClient.getChatService().getGroupMemberIds(currentChatUser.getId());
-
+                    // Dùng GroupService để lấy thành viên
+                    List<Long> memberIds = RmiClient.getGroupService().getGroupMemberIds(activeConversationId);
                     for (Long memId : memberIds) {
-                        if (memId == SessionStore.currentUser.getId()) continue; // Bỏ qua chính mình
+                        if (memId == SessionStore.currentUser.getId()) continue;
 
-                        // Lấy IP/Port từng thành viên
-                        UserDTO memInfo = RmiClient.getChatService().getUserInfo(memId);
+                        // SỬA: Dùng DirectoryService để tìm IP
+                        UserDTO memInfo = RmiClient.getDirectoryService().getUserInfo(memId);
                         if (memInfo != null && memInfo.isOnline()) {
                             p2pClient.send(memInfo.getLastIp(), memInfo.getLastPort(), msg);
                         }
                     }
                 } else {
-                    // -- CHAT 1-1 --
-                    // Lấy thông tin mới nhất của bạn (phòng khi đổi IP)
-                    UserDTO target = RmiClient.getChatService().getUserInfo(currentChatUser.getId());
+                    // SỬA: Dùng DirectoryService để tìm IP
+                    UserDTO target = RmiClient.getDirectoryService().getUserInfo(currentChatUser.getId());
                     if (target != null && target.isOnline()) {
                         p2pClient.send(target.getLastIp(), target.getLastPort(), msg);
-                    } else {
-                        System.out.println("Bạn đang offline, tin nhắn sẽ lưu trên Server.");
                     }
                 }
 
-                // 2. LƯU LỊCH SỬ VÀO SERVER
-                RmiClient.getChatService().saveMessage(msg);
+                // SỬA: Dùng MessageService để lưu tin nhắn
+                RmiClient.getMessageService().saveMessage(msg);
 
             } catch (Exception e) { e.printStackTrace(); }
         }).start();
 
-        // 3. HIỆN UI MÌNH
         addMessageBubble(text, true);
         inputField.clear();
     }
 
-    // Callback nhận tin P2P
     public void onMessageReceived(MessageDTO msg) {
-        // Chỉ hiện tin nhắn nếu đang mở đúng cửa sổ chat đó
-        // (Logic kiểm tra ID này cần tinh chỉnh tùy thuộc vào bạn dùng ConversationID hay UserID)
-        // Tạm thời hiện luôn để test
-        Platform.runLater(() -> addMessageBubble(msg.getContent(), false));
+        Platform.runLater(() -> {
+            if (activeConversationId != -1 && msg.getConversationId() == activeConversationId) {
+                addMessageBubble(msg.getContent(), false);
+            }
+        });
     }
 
     private void addMessageBubble(String text, boolean isMe) {
         Label label = new Label(text);
         label.setWrapText(true);
         label.setMaxWidth(350);
-
-        // CSS Style trực tiếp (hoặc dùng styleClass nếu đã định nghĩa trong css)
         label.setStyle(isMe
                 ? "-fx-background-color: #0084ff; -fx-text-fill: white; -fx-background-radius: 15; -fx-padding: 8 12;"
                 : "-fx-background-color: #f0f0f0; -fx-text-fill: black; -fx-background-radius: 15; -fx-padding: 8 12;");
@@ -264,7 +226,6 @@ public class MainController {
         container.setAlignment(isMe ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
 
         msgContainer.getChildren().add(container);
-        // Tự động cuộn xuống
         Platform.runLater(() -> msgScrollPane.setVvalue(1.0));
     }
 }
