@@ -5,6 +5,7 @@ import com.example.server.service.AuthServiceImpl;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import com.example.server.service.ChatServiceImpl;
+import com.example.server.service.GroupServiceImpl;
 
 public class ServerApp {
     public static void main(String[] args) {
@@ -21,6 +22,7 @@ public class ServerApp {
             // Bước này mới chỉ có AuthService, bước sau ta sẽ thêm ChatService
             registry.rebind("AuthService", new AuthServiceImpl());
             registry.rebind("ChatService", new ChatServiceImpl());
+            registry.rebind("GroupService", new GroupServiceImpl());
 
             System.out.println("Server đang chạy tại port: " + port);
 
