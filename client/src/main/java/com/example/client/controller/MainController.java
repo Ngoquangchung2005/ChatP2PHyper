@@ -44,24 +44,26 @@ public class MainController {
 
     @FXML
     public void initialize() {
-        // --- QUAN TRỌNG: Kích hoạt giao diện Custom Cell (để hiện chấm đỏ/xanh) ---
+        // --- QUAN TRỌNG: Kích hoạt giao diện Custom Cell (để hiện chấm đỏ/xanh và số tin nhắn) ---
+        // Class FriendListCell phải được tạo như hướng dẫn trước đó
         conversationList.setCellFactory(param -> new FriendListCell());
-        // -------------------------------------------------------------------------
+        // ----------------------------------------------------------------------------------------
 
         UserDTO me = SessionStore.currentUser;
         if (me != null) {
             myDisplayName.setText(me.getDisplayName());
 
-            // 1. Khởi động P2P Server
+            // 1. Khởi động P2P Server để nhận tin nhắn
             startP2P();
 
-            // 2. Tải danh sách bạn bè & Số tin chưa đọc
+            // 2. Tải danh sách bạn bè & Số tin chưa đọc từ Server
             loadFriendListInitial();
 
-            // 3. Đăng ký nhận thông báo Real-time
+            // 3. Đăng ký nhận thông báo Real-time (Online/Offline/Kết bạn)
             registerRealTimeUpdates();
         }
 
+        // Sự kiện khi chọn vào một dòng chat
         conversationList.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null) switchChat(newVal);
         });
@@ -74,6 +76,7 @@ public class MainController {
                 // 1. Bạn bè Online/Offline
                 @Override
                 public void onFriendStatusChange(UserDTO friend) throws RemoteException {
+                    // Cập nhật trạng thái hiển thị
                     Platform.runLater(() -> updateFriendInList(friend));
                 }
 
@@ -111,7 +114,7 @@ public class MainController {
                 }
             };
 
-            // Export object
+            // Export object RMI
             UnicastRemoteObject.exportObject(myCallback, 0);
 
             // Đăng ký với Server
@@ -121,7 +124,7 @@ public class MainController {
         } catch (Exception e) { e.printStackTrace(); }
     }
 
-    // Hàm cập nhật danh sách thông minh (Fix lỗi không hiện badge)
+    // Hàm cập nhật danh sách thông minh
     private void updateFriendInList(UserDTO updatedFriend) {
         boolean found = false;
         for (int i = 0; i < conversationList.getItems().size(); i++) {
@@ -132,24 +135,25 @@ public class MainController {
                 u.setLastIp(updatedFriend.getLastIp());
                 u.setLastPort(updatedFriend.getLastPort());
 
-                // [FIX]: Giữ nguyên số tin chưa đọc cũ nếu object mới không có info này
-                // (Thường Server chỉ gửi status update chứ không gửi kèm unread count)
+                // LƯU Ý: Không ghi đè unreadCount ở đây vì updatedFriend từ Server về
+                // thường không chứa count. Count được quản lý bởi logic khác.
 
                 found = true;
 
-                // [QUAN TRỌNG]: Ép ListView vẽ lại dòng này
+                // [QUAN TRỌNG]: Ép ListView vẽ lại dòng này (để đổi màu chấm xanh/đỏ)
                 conversationList.getItems().set(i, u);
                 break;
             }
         }
 
+        // Nếu chưa có (bạn mới/nhóm mới) thì thêm vào đầu
         if (!found) conversationList.getItems().add(0, updatedFriend);
 
-        // [QUAN TRỌNG]: Refresh toàn bộ để vẽ lại màu sắc/badge
+        // Refresh toàn bộ để vẽ lại
         conversationList.refresh();
     }
 
-    // Hàm public cho Controller khác gọi
+    // Hàm public cho Controller khác gọi (VD: FriendRequestController)
     public void addFriendToListDirectly(UserDTO newFriend) {
         Platform.runLater(() -> updateFriendInList(newFriend));
     }
@@ -179,10 +183,11 @@ public class MainController {
         }).start();
     }
 
-    // --- LOGIC TẢI LẠI BADGE KHI CÓ TIN NHẮN MỚI ---
+    // --- LOGIC TẢI LẠI SỐ TIN CHƯA ĐỌC ---
     private void reloadUnreadCounts() {
         new Thread(() -> {
             try {
+                // Gọi Server lấy danh sách đếm mới nhất
                 Map<Long, Integer> unreadMap = RmiClient.getMessageService().getUnreadCounts(SessionStore.currentUser.getId());
 
                 Platform.runLater(() -> {
@@ -194,10 +199,10 @@ public class MainController {
                             newCount = unreadMap.get(u.getId());
                         }
 
-                        // Nếu số lượng thay đổi thì cập nhật
+                        // Nếu số lượng thay đổi thì cập nhật và vẽ lại
                         if (u.getUnreadCount() != newCount) {
                             u.setUnreadCount(newCount);
-                            conversationList.getItems().set(i, u); // Trigger update
+                            conversationList.getItems().set(i, u); // Kích hoạt vẽ lại cell
                             changed = true;
                         }
                     }
@@ -220,9 +225,9 @@ public class MainController {
         currentChatTitle.setText(friendOrGroup.getDisplayName());
         msgContainer.getChildren().clear();
 
-        // Xóa Badge đỏ ngay lập tức trên UI
+        // Xóa số tin chưa đọc ngay lập tức trên UI
         friendOrGroup.setUnreadCount(0);
-        conversationList.refresh();
+        conversationList.refresh(); // Vẽ lại để mất số đỏ
 
         new Thread(() -> {
             try {
@@ -331,7 +336,7 @@ public class MainController {
                 }
                 RmiClient.getMessageService().saveMessage(msg);
 
-                // Mình gửi thì coi như mình đã đọc -> Mark read để không bị sai count
+                // Mình gửi thì coi như mình đã đọc -> Mark read để server không tính là unread
                 RmiClient.getMessageService().markAsRead(SessionStore.currentUser.getId(), activeConversationId);
 
             } catch (Exception e) { e.printStackTrace(); }
@@ -344,17 +349,20 @@ public class MainController {
     // --- NHẬN TIN NHẮN ---
     public void onMessageReceived(MessageDTO msg) {
         Platform.runLater(() -> {
-            // Nếu đang mở đúng hội thoại -> Hiện tin + Mark read
+            // Trường hợp 1: Đang mở đúng cửa sổ chat đó -> Hiện tin luôn
             if (activeConversationId != -1 && msg.getConversationId() == activeConversationId) {
                 addMessageBubble(msg.getContent(), false);
+
+                // Gọi Server đánh dấu đã đọc ngay vì người dùng đang nhìn thấy
                 new Thread(() -> {
                     try {
                         RmiClient.getMessageService().markAsRead(SessionStore.currentUser.getId(), activeConversationId);
                     } catch (Exception e) {}
                 }).start();
+
             } else {
-                // Nếu không mở hội thoại đó -> Tải lại số Badge
-                System.out.println("Có tin nhắn mới từ nơi khác -> Reload Badge");
+                // Trường hợp 2: Đang chat với người khác hoặc đang thu nhỏ
+                // -> Cần tăng số Badge đỏ lên
                 reloadUnreadCounts();
             }
         });

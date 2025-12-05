@@ -2,7 +2,6 @@ package com.example.client.controller;
 
 import com.example.common.dto.UserDTO;
 import javafx.geometry.Pos;
-import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.layout.HBox;
@@ -10,27 +9,11 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
 
-// Class này kế thừa ListCell để tùy biến giao diện dòng trong ListView
+// Class này dùng cho MÀN HÌNH CHÍNH (Online/Offline + Badge)
 public class FriendListCell extends ListCell<UserDTO> {
-    private final CheckBox checkBox = new CheckBox();
-
-    public FriendListCell() {
-        // Xử lý sự kiện khi bấm vào ô CheckBox
-        checkBox.setOnAction(event -> {
-            UserDTO item = getItem();
-            if (item != null && getListView() != null) {
-                if (checkBox.isSelected()) {
-                    // Nếu tick vào -> Chọn dòng đó trong ListView
-                    getListView().getSelectionModel().select(item);
-                } else {
-                    // Nếu bỏ tick -> Bỏ chọn dòng đó
-                    // getIndex() lấy vị trí hiện tại của dòng này
-                    getListView().getSelectionModel().clearSelection(getIndex());
-                }
-            }
-        });
-    }
 
     @Override
     protected void updateItem(UserDTO item, boolean empty) {
@@ -43,31 +26,34 @@ public class FriendListCell extends ListCell<UserDTO> {
             HBox hbox = new HBox(10);
             hbox.setAlignment(Pos.CENTER_LEFT);
 
-            // 1. Trạng thái Online (Chấm xanh)
+            // 1. Dấu chấm Online/Offline
             Circle statusDot = new Circle(5);
             if (item.isOnline()) {
-                statusDot.setFill(Color.LIMEGREEN);
+                statusDot.setFill(Color.LIMEGREEN); // Online: Xanh
             } else {
-                statusDot.setFill(Color.GRAY);
+                statusDot.setFill(Color.GRAY);      // Offline: Xám (hoặc Đỏ tùy bạn)
             }
 
             // 2. Tên hiển thị
             Label nameLabel = new Label(item.getDisplayName());
             nameLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: black;");
 
-            // Khoảng trắng đẩy badge sang phải
             Region spacer = new Region();
             HBox.setHgrow(spacer, Priority.ALWAYS);
 
-            // 3. [MỚI] Badge Tin nhắn chưa đọc
-            Label badge = null;
+            // 3. Số tin nhắn chưa đọc (Badge)
+            Label unreadLabel = null;
             if (item.getUnreadCount() > 0) {
-                badge = new Label(String.valueOf(item.getUnreadCount()));
-                badge.getStyleClass().add("unread-badge");
+                unreadLabel = new Label("(" + item.getUnreadCount() + ")");
+                unreadLabel.setTextFill(Color.RED);
+                unreadLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
+
+                // In đậm tên nếu có tin nhắn mới
+                nameLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 14));
             }
 
-            if (badge != null) {
-                hbox.getChildren().addAll(statusDot, nameLabel, spacer, badge);
+            if (unreadLabel != null) {
+                hbox.getChildren().addAll(statusDot, nameLabel, spacer, unreadLabel);
             } else {
                 hbox.getChildren().addAll(statusDot, nameLabel);
             }

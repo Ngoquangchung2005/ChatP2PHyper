@@ -17,7 +17,8 @@ public class CreateGroupController {
     @FXML
     public void initialize() {
         friendCheckList.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
-        friendCheckList.setCellFactory(param -> new FriendListCell());
+        // SỬA DÒNG NÀY: Dùng CheckableFriendListCell
+        friendCheckList.setCellFactory(param -> new CheckableFriendListCell());
         loadFriends();
     }
 
