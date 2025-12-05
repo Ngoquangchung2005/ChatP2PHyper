@@ -1,6 +1,7 @@
 package com.example.server.service;
 
 import com.example.common.dto.UserDTO;
+import com.example.common.service.ClientCallback; // Nhớ import
 import com.example.common.service.GroupService;
 import com.example.server.config.Database;
 
@@ -18,14 +19,13 @@ public class GroupServiceImpl extends UnicastRemoteObject implements GroupServic
 
     @Override
     public long createGroup(String groupName, List<Long> memberIds) throws RemoteException {
-        // ... (Copy y nguyên logic createGroup từ ChatServiceImpl cũ sang đây) ...
-        // Nhớ copy cả phần try-catch, connection, transaction...
         long conversationId = 0;
         Connection conn = null;
         try {
             conn = Database.getConnection();
             conn.setAutoCommit(false);
 
+            // 1. Tạo Conversation
             String sqlConv = "INSERT INTO conversations (name, is_group, created_at) VALUES (?, TRUE, NOW())";
             try (PreparedStatement ps = conn.prepareStatement(sqlConv, Statement.RETURN_GENERATED_KEYS)) {
                 ps.setString(1, groupName);
@@ -35,6 +35,7 @@ public class GroupServiceImpl extends UnicastRemoteObject implements GroupServic
                 }
             }
 
+            // 2. Thêm thành viên
             String sqlMem = "INSERT INTO conversation_members (conversation_id, user_id) VALUES (?, ?)";
             try (PreparedStatement ps = conn.prepareStatement(sqlMem)) {
                 for (Long userId : memberIds) {
@@ -45,6 +46,12 @@ public class GroupServiceImpl extends UnicastRemoteObject implements GroupServic
                 ps.executeBatch();
             }
             conn.commit();
+
+            // 3. [MỚI] THÔNG BÁO REAL-TIME CHO CÁC THÀNH VIÊN
+            if (conversationId > 0) {
+                notifyGroupMembers(conversationId, groupName, memberIds);
+            }
+
             return conversationId;
         } catch (SQLException e) {
             if (conn != null) try { conn.rollback(); } catch (SQLException ex) {}
@@ -52,6 +59,31 @@ public class GroupServiceImpl extends UnicastRemoteObject implements GroupServic
             return 0;
         } finally {
             if (conn != null) try { conn.close(); } catch (SQLException e) {}
+        }
+    }
+
+    // --- HÀM BẮN THÔNG BÁO ---
+    private void notifyGroupMembers(long groupId, String groupName, List<Long> memberIds) {
+        // Tạo đối tượng Group (giả lập UserDTO như logic cũ) để hiển thị lên List
+        UserDTO groupDTO = new UserDTO();
+        groupDTO.setId(groupId);
+        groupDTO.setDisplayName("[Nhóm] " + groupName);
+        groupDTO.setUsername("GROUP");
+        groupDTO.setOnline(true);
+
+        // Duyệt qua từng thành viên
+        for (Long userId : memberIds) {
+            // Lấy callback của người đó từ AuthServiceImpl
+            ClientCallback cb = AuthServiceImpl.getClientCallback(userId);
+            if (cb != null) {
+                new Thread(() -> {
+                    try {
+                        cb.onAddedToGroup(groupDTO);
+                    } catch (RemoteException e) {
+                        e.printStackTrace();
+                    }
+                }).start();
+            }
         }
     }
 

@@ -13,4 +13,7 @@ public interface ClientCallback extends Remote {
 
     // [MỚI] Báo khi lời mời của mình được chấp nhận (để cập nhật list ngay)
     void onFriendRequestAccepted(UserDTO newFriend) throws RemoteException;
+
+    // [MỚI] Hàm báo khi được thêm vào nhóm
+    void onAddedToGroup(UserDTO newGroup) throws RemoteException;
 }

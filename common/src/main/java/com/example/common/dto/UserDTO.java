@@ -4,6 +4,7 @@ import java.io.Serializable;
 
 public class UserDTO implements Serializable {
     private static final long serialVersionUID = 1L;
+    private int unreadCount = 0; // [MỚI] Số tin nhắn chưa đọc
 
     private long id;
     private String username;
@@ -33,6 +34,8 @@ public class UserDTO implements Serializable {
     public void setLastIp(String lastIp) { this.lastIp = lastIp; }
     public int getLastPort() { return lastPort; }
     public void setLastPort(int lastPort) { this.lastPort = lastPort; }
+    public int getUnreadCount() { return unreadCount; }
+    public void setUnreadCount(int unreadCount) { this.unreadCount = unreadCount; }
 
     @Override
     public String toString() { return displayName; } // Để hiển thị trên ListView

@@ -30,6 +30,7 @@
         <HBox spacing="5" alignment="CENTER">
             <padding><Insets bottom="10" top="10"/></padding>
             <Button text="Thêm bạn" styleClass="btn-link" onAction="#handleAddFriend"/>
+            <Button text="Lời mời" styleClass="btn-link" onAction="#handleShowRequests"/>
             <Button text="Tạo nhóm" styleClass="btn-link" onAction="#handleCreateGroup" />
         </HBox>
     </VBox>

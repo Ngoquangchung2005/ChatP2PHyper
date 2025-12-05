@@ -12,14 +12,14 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class AuthServiceImpl extends UnicastRemoteObject implements AuthService {
 
     // Danh sách lưu "cái loa" (Callback) của các user đang online
-    // Key: UserId, Value: Callback của Client đó
-    // Đổi private thành public static hoặc thêm getter
     private static final Map<Long, ClientCallback> onlineClients = new ConcurrentHashMap<>();
 
     public AuthServiceImpl() throws RemoteException {
@@ -44,7 +44,7 @@ public class AuthServiceImpl extends UnicastRemoteObject implements AuthService 
                     long userId = rs.getLong("id");
                     String displayName = rs.getString("display_name");
 
-                    // Cập nhật trạng thái vào DB (để lưu IP/Port mới nhất)
+                    // Cập nhật trạng thái vào DB
                     updateUserStatus(userId, true, clientIp, p2pPort);
 
                     // Trả về thông tin User cho Client
@@ -59,63 +59,73 @@ public class AuthServiceImpl extends UnicastRemoteObject implements AuthService 
             e.printStackTrace();
             throw new RemoteException("Lỗi Database: " + e.getMessage());
         }
-        return null; // Đăng nhập thất bại
+        return null;
     }
-
-    // --- LOGIC REAL-TIME (QUAN TRỌNG) ---
 
     @Override
     public void registerNotification(long userId, ClientCallback callback) throws RemoteException {
-        // 1. Lưu callback của người này lại
         onlineClients.put(userId, callback);
         System.out.println("User ID " + userId + " đã online và đăng ký nhận thông báo.");
 
-        // 2. Lấy thông tin đầy đủ của người vừa online từ DB
         UserDTO me = getUserInfoFromDB(userId);
-
-        // 3. Thông báo cho TẤT CẢ người khác biết là "Tôi vừa online"
         if (me != null) {
-            notifyAllOnlineUsers(me);
+            notifyFriendsOnly(me); // <--- SỬA: Chỉ báo cho bạn bè
         }
     }
 
     @Override
     public void logout(long userId) throws RemoteException {
-        // 1. Xóa khỏi danh sách nhận tin
         onlineClients.remove(userId);
-
-        // 2. Cập nhật DB thành offline
         updateUserStatus(userId, false, null, 0);
 
-        // 3. Báo cho mọi người biết là "Tôi đã offline"
         UserDTO meOffline = new UserDTO();
         meOffline.setId(userId);
-        meOffline.setOnline(false); // Quan trọng: set false để Client kia biết mà hiện chấm xám
+        meOffline.setOnline(false);
 
-        notifyAllOnlineUsers(meOffline);
+        notifyFriendsOnly(meOffline); // <--- SỬA: Chỉ báo cho bạn bè
 
         System.out.println("User ID " + userId + " đã đăng xuất.");
     }
 
-    // Hàm phụ trợ: Gửi thông báo cho tất cả user khác đang online
-    private void notifyAllOnlineUsers(UserDTO changeUser) {
-        onlineClients.forEach((id, clientCb) -> {
-            // Không báo cho chính mình (vì mình tự biết mình online rồi)
-            if (id != changeUser.getId()) {
-                // Chạy luồng riêng để việc gửi tin không làm chậm Server
+    // --- [HÀM MỚI] CHỈ GỬI THÔNG BÁO CHO BẠN BÈ ---
+    private void notifyFriendsOnly(UserDTO changeUser) {
+        // 1. Lấy danh sách ID bạn bè của người này từ Database
+        List<Long> friendIds = getFriendIds(changeUser.getId());
+
+        // 2. Chỉ gửi thông báo cho những bạn bè ĐANG ONLINE
+        for (Long friendId : friendIds) {
+            ClientCallback clientCb = onlineClients.get(friendId);
+            if (clientCb != null) {
                 new Thread(() -> {
                     try {
                         clientCb.onFriendStatusChange(changeUser);
                     } catch (RemoteException e) {
-                        // Nếu lỗi (Client bị tắt đột ngột/rớt mạng), xóa luôn khỏi danh sách
-                        onlineClients.remove(id);
+                        onlineClients.remove(friendId);
                     }
                 }).start();
             }
-        });
+        }
     }
 
-    // --- CÁC HÀM HỖ TRỢ DB ---
+    // [HÀM MỚI] Truy vấn DB lấy danh sách ID bạn bè
+    private List<Long> getFriendIds(long userId) {
+        List<Long> list = new ArrayList<>();
+        // Chỉ lấy những người đã là bạn bè (ACCEPTED)
+        String sql = "SELECT friend_id FROM friendships WHERE user_id = ? AND status = 'ACCEPTED'";
+        try (Connection conn = Database.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, userId);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                list.add(rs.getLong("friend_id"));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
+
+    // ... (Các hàm hỗ trợ cũ giữ nguyên) ...
 
     private void updateUserStatus(long userId, boolean online, String ip, int port) {
         String sql = "UPDATE users SET is_online = ?, last_ip = ?, last_port = ? WHERE id = ?";
@@ -126,9 +136,7 @@ public class AuthServiceImpl extends UnicastRemoteObject implements AuthService 
             ps.setInt(3, port);
             ps.setLong(4, userId);
             ps.executeUpdate();
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+        } catch (SQLException e) { e.printStackTrace(); }
     }
 
     private UserDTO getUserInfoFromDB(long userId) {
@@ -148,28 +156,23 @@ public class AuthServiceImpl extends UnicastRemoteObject implements AuthService 
         return null;
     }
 
-    // (Các hàm khác giữ nguyên logic cũ hoặc trả về false nếu chưa implement)
     @Override
-    public boolean register(String username, String password, String displayName, String email) throws RemoteException {
-        // Logic đăng ký cũ của bạn... (Copy lại nếu cần, hoặc để code cũ)
+    public boolean register(String u, String p, String d, String e) throws RemoteException {
+        // (Giữ nguyên code register của bạn)
         String sql = "INSERT INTO users (username, password_hash, display_name, email) VALUES (?, ?, ?, ?)";
         try (Connection conn = Database.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, username);
-            ps.setString(2, PasswordHasher.hash(password));
-            ps.setString(3, displayName);
-            ps.setString(4, email);
+            ps.setString(1, u);
+            ps.setString(2, PasswordHasher.hash(p));
+            ps.setString(3, d);
+            ps.setString(4, e);
             return ps.executeUpdate() > 0;
-        } catch (SQLException e) {
-            return false;
-        }
+        } catch (SQLException ex) { return false; }
     }
 
     @Override
-    public boolean resetPassword(String username, String email, String newPassword) throws RemoteException {
-        return false; // Tạm thời chưa cần
-    }
-    // [MỚI] Hàm tiện ích để các Service khác lấy "cái loa" của User
+    public boolean resetPassword(String u, String e, String n) throws RemoteException { return false; }
+
     public static ClientCallback getClientCallback(long userId) {
         return onlineClients.get(userId);
     }

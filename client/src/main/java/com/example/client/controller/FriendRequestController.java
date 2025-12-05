@@ -8,21 +8,20 @@ import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.layout.HBox;
 import javafx.stage.Stage;
-import javafx.util.Callback;
 
 import java.util.List;
 
 public class FriendRequestController {
     @FXML private ListView<UserDTO> requestList;
-    private MainController mainController; // Để gọi update lại list chính
+    private MainController mainController;
 
+    // Hàm để MainController truyền chính nó vào đây
     public void setMainController(MainController mc) {
         this.mainController = mc;
     }
 
     @FXML
     public void initialize() {
-        // Custom Cell: Hiện tên + Nút chấp nhận
         requestList.setCellFactory(param -> new ListCell<>() {
             @Override
             protected void updateItem(UserDTO item, boolean empty) {
@@ -45,6 +44,7 @@ public class FriendRequestController {
     private void loadRequests() {
         new Thread(() -> {
             try {
+                // Gọi FriendService
                 List<UserDTO> list = RmiClient.getFriendService().getPendingRequests(SessionStore.currentUser.getId());
                 Platform.runLater(() -> requestList.getItems().setAll(list));
             } catch (Exception e) { e.printStackTrace(); }
@@ -54,15 +54,20 @@ public class FriendRequestController {
     private void accept(UserDTO sender) {
         new Thread(() -> {
             try {
+                // Gọi FriendService
                 boolean ok = RmiClient.getFriendService().acceptFriendRequest(SessionStore.currentUser.getId(), sender.getId());
                 Platform.runLater(() -> {
                     if (ok) {
                         requestList.getItems().remove(sender);
-                        // CẬP NHẬT LIST CHÍNH NGAY LẬP TỨC
+
+                        // CẬP NHẬT LIST CHÍNH NGAY LẬP TỨC MÀ KHÔNG CẦN RELOAD
                         if (mainController != null) {
-                            sender.setOnline(true); // Giả định
+                            sender.setOnline(true);
                             mainController.addFriendToListDirectly(sender);
                         }
+
+                        Alert a = new Alert(Alert.AlertType.INFORMATION, "Đã chấp nhận kết bạn!");
+                        a.show();
                     }
                 });
             } catch (Exception e) { e.printStackTrace(); }
@@ -72,5 +77,4 @@ public class FriendRequestController {
     @FXML void handleClose() {
         ((Stage) requestList.getScene().getWindow()).close();
     }
-
 }

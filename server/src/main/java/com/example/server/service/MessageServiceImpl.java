@@ -9,6 +9,7 @@ import java.rmi.server.UnicastRemoteObject;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class MessageServiceImpl extends UnicastRemoteObject implements MessageService {
 
@@ -97,6 +98,72 @@ public class MessageServiceImpl extends UnicastRemoteObject implements MessageSe
         } finally {
             if (conn != null) try { conn.close(); } catch (Exception ex) {}
         }
+        return 0;
+    }
+    // ... (Các hàm cũ giữ nguyên) ...
+
+    @Override
+    public Map<Long, Integer> getUnreadCounts(long userId) throws RemoteException {
+        Map<Long, Integer> map = new java.util.HashMap<>();
+
+        // Query đếm số tin nhắn được tạo SAU thời điểm last_seen_at của user
+        String sql = "SELECT c.id as conv_id, c.is_group, COUNT(m.id) as unread " +
+                "FROM conversation_members cm " +
+                "JOIN conversations c ON cm.conversation_id = c.id " +
+                "JOIN messages m ON c.id = m.conversation_id " +
+                "WHERE cm.user_id = ? " +
+                "  AND m.created_at > cm.last_seen_at " +
+                "  AND m.sender_id != ? " + // Không đếm tin nhắn của chính mình
+                "GROUP BY c.id, c.is_group";
+
+        try (Connection conn = Database.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, userId);
+            ps.setLong(2, userId);
+            ResultSet rs = ps.executeQuery();
+
+            while (rs.next()) {
+                long convId = rs.getLong("conv_id");
+                boolean isGroup = rs.getBoolean("is_group");
+                int count = rs.getInt("unread");
+
+                if (isGroup) {
+                    // Nếu là nhóm: Key chính là ID nhóm (conv_id)
+                    map.put(convId, count);
+                } else {
+                    // Nếu là chat 1-1: Key phải là ID của NGƯỜI BẠN kia
+                    long friendId = getFriendIdFromConv(convId, userId);
+                    if (friendId != 0) {
+                        map.put(friendId, count);
+                    }
+                }
+            }
+        } catch (SQLException e) { e.printStackTrace(); }
+        return map;
+    }
+
+    @Override
+    public void markAsRead(long userId, long conversationId) throws RemoteException {
+        // Cập nhật last_seen_at thành thời điểm hiện tại (NOW)
+        String sql = "UPDATE conversation_members SET last_seen_at = NOW() WHERE conversation_id = ? AND user_id = ?";
+        try (Connection conn = Database.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, conversationId);
+            ps.setLong(2, userId);
+            ps.executeUpdate();
+        } catch (SQLException e) { e.printStackTrace(); }
+    }
+
+    // Hàm phụ: Tìm ID người kia trong cuộc hội thoại 1-1
+    private long getFriendIdFromConv(long convId, long myId) {
+        String sql = "SELECT user_id FROM conversation_members WHERE conversation_id = ? AND user_id != ?";
+        try (Connection conn = Database.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, convId);
+            ps.setLong(2, myId);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) return rs.getLong("user_id");
+        } catch (SQLException e) { e.printStackTrace(); }
         return 0;
     }
 }

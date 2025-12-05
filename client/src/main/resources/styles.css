@@ -50,3 +50,15 @@
     -fx-font-size: 14px;
     -fx-cursor: hand;
 }
+/* Badge số tin nhắn chưa đọc */
+.unread-badge {
+    -fx-background-color: red;
+    -fx-text-fill: white;
+    -fx-background-radius: 10;
+    -fx-min-width: 20px;
+    -fx-min-height: 20px;
+    -fx-alignment: center;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-padding: 0 4 0 4;
+}
