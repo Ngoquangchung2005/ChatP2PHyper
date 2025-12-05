@@ -36,6 +36,13 @@ public class LoginController {
         }
 
         try {
+//            // --- SỬA ĐOẠN NÀY ---
+//            // Code cũ: String myIp = "127.0.0.1";
+//
+//            // Code mới: Tự động lấy IP LAN của máy đang chạy Client
+//            String myIp = InetAddress.getLocalHost().getHostAddress();
+//
+//            System.out.println("IP của tôi là: " + myIp); // In ra để kiểm tra
             // Lấy IP thật của máy (tạm thời để localhost nếu chạy 1 máy)
             String myIp = "127.0.0.1";
             int myPort = generateRandomPort(); // <--- Tạo port mới

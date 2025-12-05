@@ -11,6 +11,8 @@ import java.sql.PreparedStatement;
 public class ServerApp {
     public static void main(String[] args) {
         try {
+      // Thay "192.168.1.50" bằng IP thật của Máy A mà bạn vừa tìm được ở Bước 1 Cấu hình chạy 2 máy
+        //        System.setProperty("java.rmi.server.hostname", "192.168.1.50"); Cấu hình chạy 2 máy
             // 1. [FIX LỖI] RESET TRẠNG THÁI ONLINE CỦA TẤT CẢ USER KHI KHỞI ĐỘNG SERVER
             resetAllUsersOffline();
             // -------------------------------------------------------------------------

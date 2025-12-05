@@ -12,7 +12,7 @@ public class RmiClient {
     private static FriendService friendService;
     private static MessageService messageService;
     private static DirectoryService directoryService;
-
+//    private static final String SERVER_HOST = "192.168.1.50"; Cấu hình chạy 2 máy
     private static final String SERVER_HOST = "localhost";
     private static final int SERVER_PORT = 1099;
 
