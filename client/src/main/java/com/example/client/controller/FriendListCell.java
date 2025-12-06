@@ -26,28 +26,26 @@ public class FriendListCell extends ListCell<UserDTO> {
         if (empty || item == null) {
             setGraphic(null);
             setText(null);
+            setStyle("-fx-background-color: transparent;"); // Giữ nền trong suốt
         } else {
-            HBox hbox = new HBox(10);
+            HBox hbox = new HBox(12);
             hbox.setAlignment(Pos.CENTER_LEFT);
+            hbox.setPrefHeight(60);
 
             // 1. Avatar (Hình tròn)
             ImageView avatarView = new ImageView();
-            avatarView.setFitWidth(40);
-            avatarView.setFitHeight(40);
-            // Tạo khung tròn cho ảnh
-            Circle clip = new Circle(20, 20, 20);
+            avatarView.setFitWidth(48);
+            avatarView.setFitHeight(48);
+            Circle clip = new Circle(24, 24, 24);
             avatarView.setClip(clip);
 
-            // Load ảnh mặc định trước
-            // (Bạn nên có file user.png trong resources, nếu không thì dùng màu nền)
-            avatarView.setImage(null);
-            avatarView.setStyle("-fx-background-color: #ccc;");
+            // Placeholder avatar màu xám
+            avatarView.setStyle("-fx-background-color: #555;");
 
-            // Tải ảnh từ Server nếu có URL
+            // Load avatar thật
             if (item.getAvatarUrl() != null) {
                 new Thread(() -> {
                     try {
-                        // Tải file avatar về (Dùng hàm downloadFile của MessageService)
                         byte[] data = RmiClient.getMessageService().downloadFile(item.getAvatarUrl());
                         if (data != null) {
                             Image img = new Image(new ByteArrayInputStream(data));
@@ -57,36 +55,46 @@ public class FriendListCell extends ListCell<UserDTO> {
                 }).start();
             }
 
-            // 2. Thông tin (Tên + Status)
-            VBox infoBox = new VBox(2);
-            Label nameLabel = new Label(item.getDisplayName());
-            nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
+            // StackPane để chứa avatar + chấm online (nếu cần thiết kế kỹ hơn)
+            // Ở đây để đơn giản ta dùng HBox
 
-            String status = item.getStatusMsg() != null ? item.getStatusMsg() : (item.isOnline() ? "Online" : "Offline");
-            Label statusLabel = new Label(status);
-            statusLabel.setStyle("-fx-text-fill: gray; -fx-font-size: 11px;");
+            // 2. Thông tin (Tên + Status)
+            VBox infoBox = new VBox(4);
+            infoBox.setAlignment(Pos.CENTER_LEFT);
+
+            Label nameLabel = new Label(item.getDisplayName());
+            nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 15px; -fx-text-fill: #e4e6eb;");
+
+            String statusText = item.getStatusMsg() != null && !item.getStatusMsg().isEmpty()
+                    ? item.getStatusMsg()
+                    : (item.isOnline() ? "Đang hoạt động" : "Offline");
+
+            Label statusLabel = new Label(statusText);
+            // Nếu online thì chữ xanh, không thì chữ xám
+            if (item.isOnline()) {
+                statusLabel.setStyle("-fx-text-fill: #31a24c; -fx-font-size: 12px;"); // Xanh lá
+            } else {
+                statusLabel.setStyle("-fx-text-fill: #b0b3b8; -fx-font-size: 12px;");
+            }
 
             infoBox.getChildren().addAll(nameLabel, statusLabel);
 
-            // 3. Dấu chấm Online/Offline
+            // 3. Spacer đẩy nội dung sang phải
             Region spacer = new Region();
             HBox.setHgrow(spacer, Priority.ALWAYS);
 
-            Circle statusDot = new Circle(5);
-            statusDot.setFill(item.isOnline() ? Color.LIMEGREEN : Color.GRAY);
-
-            // 4. Badge tin nhắn chưa đọc
-            Label unreadLabel = null;
+            // 4. Badge tin nhắn chưa đọc (Màu đỏ nổi bật)
+            HBox badgeContainer = new HBox();
             if (item.getUnreadCount() > 0) {
-                unreadLabel = new Label(String.valueOf(item.getUnreadCount()));
-                unreadLabel.setStyle("-fx-background-color: red; -fx-text-fill: white; -fx-background-radius: 10; -fx-padding: 0 5; -fx-font-size: 10px;");
+                Label unreadLabel = new Label(String.valueOf(item.getUnreadCount()));
+                unreadLabel.getStyleClass().add("unread-badge"); // Định nghĩa trong CSS
+                badgeContainer.getChildren().add(unreadLabel);
             }
 
-            hbox.getChildren().addAll(avatarView, infoBox, spacer);
-            if (unreadLabel != null) hbox.getChildren().add(unreadLabel);
-            hbox.getChildren().add(statusDot);
+            hbox.getChildren().addAll(avatarView, infoBox, spacer, badgeContainer);
 
             setGraphic(hbox);
+            setText(null);
         }
     }
 }
