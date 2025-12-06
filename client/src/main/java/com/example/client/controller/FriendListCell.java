@@ -27,32 +27,26 @@ public class FriendListCell extends ListCell<UserDTO> {
         if (empty || item == null) {
             setGraphic(null);
             setText(null);
-            // Đặt nền trong suốt khi không có dữ liệu để không bị lỗi hiển thị
             setStyle("-fx-background-color: transparent;");
         } else {
             HBox hbox = new HBox(15);
             hbox.setAlignment(Pos.CENTER_LEFT);
-            hbox.setPrefHeight(65); // Tăng chiều cao một chút cho thoáng
+            hbox.setPrefHeight(65);
 
-            // --- 1. AVATAR (Có Placeholder + Chấm Online) ---
+            // --- AVATAR ---
             StackPane avatarStack = new StackPane();
-
-            // Lớp nền (Placeholder) hình tròn màu xám - Giúp avatar luôn có hình dáng kể cả khi chưa load ảnh
-            Circle placeholder = new Circle(25, Color.web("#3e4042"));
+            // Nền xám nhạt
+            Circle placeholder = new Circle(25, Color.web("#e0e0e0"));
             avatarStack.getChildren().add(placeholder);
 
-            // Ảnh Avatar chính
             ImageView avatarView = new ImageView();
             avatarView.setFitWidth(50);
             avatarView.setFitHeight(50);
             avatarView.setPreserveRatio(false);
-            avatarView.setSmooth(true); // Làm mịn ảnh
-
-            // Bo tròn ảnh
+            avatarView.setSmooth(true);
             Circle clip = new Circle(25, 25, 25);
             avatarView.setClip(clip);
 
-            // Logic tải ảnh từ Server
             if (item.getAvatarUrl() != null && !item.getAvatarUrl().isEmpty()) {
                 new Thread(() -> {
                     try {
@@ -61,71 +55,64 @@ public class FriendListCell extends ListCell<UserDTO> {
                             Image img = new Image(new ByteArrayInputStream(data));
                             Platform.runLater(() -> avatarView.setImage(img));
                         }
-                    } catch (Exception e) {
-                        // Nếu lỗi thì giữ nguyên placeholder
-                    }
+                    } catch (Exception e) {}
                 }).start();
             }
             avatarStack.getChildren().add(avatarView);
 
-            // Chấm trạng thái Online (Chỉ hiện nếu user đang online)
             if (item.isOnline()) {
-                Circle onlineDot = new Circle(7, Color.web("#31a24c")); // Màu xanh lá
-                onlineDot.setStroke(Color.web("#242526")); // Viền trùng màu nền sidebar để tạo hiệu ứng cắt
+                Circle onlineDot = new Circle(7, Color.web("#31a24c"));
+                // Viền trắng
+                onlineDot.setStroke(Color.WHITE);
                 onlineDot.setStrokeWidth(2.5);
                 StackPane.setAlignment(onlineDot, Pos.BOTTOM_RIGHT);
                 avatarStack.getChildren().add(onlineDot);
             }
 
-            // --- 2. THÔNG TIN (Tên + Status) ---
+            // --- INFO ---
             VBox infoBox = new VBox(4);
             infoBox.setAlignment(Pos.CENTER_LEFT);
 
             Label nameLabel = new Label(item.getDisplayName());
-            nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 16px; -fx-text-fill: #e4e6eb;");
+            // [QUAN TRỌNG] Tên màu đen (#333)
+            nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 16px; -fx-text-fill: #333;");
 
-            // [LOGIC MỚI] Xử lý hiển thị trạng thái chuẩn xác
             String subText;
             String styleText;
 
             if (item.isOnline()) {
-                // Nếu Online: Ưu tiên status tùy chỉnh, nếu không thì hiện "Đang hoạt động"
                 if (item.getStatusMsg() != null && !item.getStatusMsg().isEmpty()) {
                     subText = item.getStatusMsg();
                 } else {
                     subText = "Đang hoạt động";
                 }
-                styleText = "-fx-text-fill: #31a24c; -fx-font-size: 13px;"; // Chữ xanh lá hoặc sáng
+                styleText = "-fx-text-fill: #31a24c; -fx-font-size: 13px;";
             } else {
-                // Nếu Offline: Bắt buộc hiện "Offline" (hoặc thời gian truy cập cuối nếu có data)
                 subText = "Offline";
-                styleText = "-fx-text-fill: #b0b3b8; -fx-font-size: 13px;"; // Chữ xám tối
+                // [QUAN TRỌNG] Offline màu xám (#666)
+                styleText = "-fx-text-fill: #666; -fx-font-size: 13px;";
             }
 
-            // Cắt ngắn nếu status quá dài để không vỡ giao diện
-            if (subText.length() > 25) {
-                subText = subText.substring(0, 22) + "...";
-            }
+            if (subText.length() > 25) subText = subText.substring(0, 22) + "...";
 
             Label statusLabel = new Label(subText);
             statusLabel.setStyle(styleText);
 
             infoBox.getChildren().addAll(nameLabel, statusLabel);
 
-            // --- 3. BADGE TIN NHẮN CHƯA ĐỌC ---
+            // --- BADGE ---
             Region spacer = new Region();
-            HBox.setHgrow(spacer, Priority.ALWAYS); // Đẩy phần còn lại sang phải cùng
+            HBox.setHgrow(spacer, Priority.ALWAYS);
 
             HBox rightBox = new HBox();
             rightBox.setAlignment(Pos.CENTER_RIGHT);
 
             if (item.getUnreadCount() > 0) {
                 Label unreadLabel = new Label(String.valueOf(item.getUnreadCount()));
-                unreadLabel.getStyleClass().add("unread-badge"); // Class định nghĩa trong CSS
+                unreadLabel.getStyleClass().add("unread-badge");
                 rightBox.getChildren().add(unreadLabel);
-
-                // Nếu có tin nhắn mới, làm đậm dòng status để chú ý
-                statusLabel.setStyle("-fx-text-fill: #e4e6eb; -fx-font-weight: bold; -fx-font-size: 13px;");
+                // Status đậm màu đen
+                statusLabel.setStyle("-fx-text-fill: #333; -fx-font-weight: bold; -fx-font-size: 13px;");
             }
 
             hbox.getChildren().addAll(avatarStack, infoBox, spacer, rightBox);

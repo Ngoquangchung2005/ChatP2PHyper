@@ -20,26 +20,30 @@
             xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.example.client.controller.MainController">
 
+    <padding>
+        <Insets top="15" right="15" bottom="15" left="15"/>
+    </padding>
+
     <left>
         <VBox prefWidth="320.0" spacing="15.0" styleClass="sidebar">
             <padding><Insets bottom="15" left="15" right="15" top="20"/></padding>
+            <BorderPane.margin>
+                <Insets right="15"/>
+            </BorderPane.margin>
 
             <HBox alignment="CENTER_LEFT" spacing="12.0">
                 <StackPane>
-                    <Circle radius="22.5" fill="#3e4042" />
-
-                    <ImageView fx:id="myAvatarView" fitHeight="45.0" fitWidth="45.0" pickOnBounds="true" preserveRatio="false">
-                        <clip><Circle centerX="22.5" centerY="22.5" radius="22.5" /></clip>
-                    </ImageView>
-
-                    <Circle radius="6" fill="#31a24c" stroke="#242526" strokeWidth="2" StackPane.alignment="BOTTOM_RIGHT"/>
+                    <Circle radius="22.5" fill="#e0e0e0" /> <ImageView fx:id="myAvatarView" fitHeight="45.0" fitWidth="45.0" pickOnBounds="true" preserveRatio="false">
+                    <clip><Circle centerX="22.5" centerY="22.5" radius="22.5" /></clip>
+                </ImageView>
+                    <Circle radius="6" fill="#31a24c" stroke="#ffffff" strokeWidth="2" StackPane.alignment="BOTTOM_RIGHT"/>
                 </StackPane>
 
                 <VBox alignment="CENTER_LEFT">
-                    <Label fx:id="myDisplayName" text="Tôi" textFill="#e4e6eb">
+                    <Label fx:id="myDisplayName" text="Tôi" textFill="#333333">
                         <font><Font name="Segoe UI Bold" size="22.0"/></font>
                     </Label>
-                    <Label text="Trực tuyến" textFill="#b0b3b8" style="-fx-font-size: 12px;"/>
+                    <Label text="Trực tuyến" textFill="#65676b" style="-fx-font-size: 12px;"/>
                 </VBox>
 
                 <Region HBox.hgrow="ALWAYS" />
@@ -49,8 +53,7 @@
                 </Button>
             </HBox>
 
-            <TextField promptText="Tìm kiếm trên Messenger..." styleClass="input-field"
-                       style="-fx-background-radius: 20; -fx-padding: 8 15;"/>
+            <TextField promptText="Tìm kiếm trên Messenger..." styleClass="input-field" />
 
             <ListView fx:id="conversationList" styleClass="list-view" VBox.vgrow="ALWAYS"/>
 
@@ -70,17 +73,17 @@
 
     <center>
         <StackPane>
-            <VBox fx:id="welcomeArea" alignment="CENTER" spacing="15" style="-fx-background-color: #18191a;">
-                <Label text="Chào mừng đến với Hybrid Messenger" textFill="#e4e6eb">
+            <VBox fx:id="welcomeArea" alignment="CENTER" spacing="15" styleClass="chat-area">
+                <Label text="Chào mừng đến với Hybrid Messenger" textFill="#333333">
                     <font><Font name="Segoe UI Bold" size="24.0"/></font>
                 </Label>
-                <Label text="Hãy chọn một đoạn chat để bắt đầu trò chuyện." textFill="#b0b3b8" />
+                <Label text="Hãy chọn một đoạn chat để bắt đầu trò chuyện." textFill="#65676b" />
             </VBox>
 
             <VBox fx:id="chatArea" styleClass="chat-area" visible="false">
                 <HBox alignment="CENTER_LEFT" spacing="15.0" styleClass="chat-header">
                     <VBox>
-                        <Label fx:id="currentChatTitle" text="Tên Người Dùng" textFill="#e4e6eb">
+                        <Label fx:id="currentChatTitle" text="Tên Người Dùng" textFill="#333333">
                             <font><Font name="Segoe UI Bold" size="18.0"/></font>
                         </Label>
                         <Label text="Đang hoạt động" textFill="#31a24c" style="-fx-font-size: 12px; -fx-font-weight: bold;"/>
@@ -88,10 +91,9 @@
 
                     <Region HBox.hgrow="ALWAYS" />
 
-                    <Button onAction="#handleVoiceCall" styleClass="btn-icon" text="📹" style="-fx-font-size: 20px; -fx-text-fill: #0084ff;">
+                    <Button onAction="#handleVoiceCall" styleClass="btn-icon" text="📹" style="-fx-font-size: 20px;">
                         <tooltip><Tooltip text="Gọi Video"/></tooltip>
                     </Button>
-
                     <Button onAction="#handleToggleInfo" styleClass="btn-icon" text="ℹ" style="-fx-font-size: 20px;"/>
                 </HBox>
 
@@ -107,12 +109,11 @@
                         <tooltip><Tooltip text="Giữ để ghi âm"/></tooltip>
                     </Button>
                     <TextField fx:id="inputField" onAction="#handleSend" promptText="Aa" styleClass="input-field" HBox.hgrow="ALWAYS" />
-                    <Button defaultButton="true" onAction="#handleSend" styleClass="btn-icon" text="➤" style="-fx-text-fill: #0084ff; -fx-font-size: 22px;">
+                    <Button defaultButton="true" onAction="#handleSend" styleClass="btn-icon" text="➤" style="-fx-font-size: 22px;">
                         <tooltip><Tooltip text="Gửi tin nhắn"/></tooltip>
                     </Button>
                 </HBox>
             </VBox>
         </StackPane>
     </center>
-
 </BorderPane>

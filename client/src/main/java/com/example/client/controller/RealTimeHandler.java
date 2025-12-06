@@ -20,6 +20,7 @@ public class RealTimeHandler extends UnicastRemoteObject implements ClientCallba
 
     @Override
     public void onFriendStatusChange(UserDTO friend) throws RemoteException {
+        // Cập nhật trạng thái Online/Offline
         Platform.runLater(() -> mainController.updateFriendInList(friend));
     }
 
@@ -43,6 +44,7 @@ public class RealTimeHandler extends UnicastRemoteObject implements ClientCallba
             alert.setContentText(newFriend.getDisplayName() + " đã chấp nhận lời mời!");
             alert.show();
 
+            // Thêm bạn mới vào danh sách ngay lập tức
             newFriend.setOnline(true);
             mainController.addFriendToListDirectly(newFriend);
         });
@@ -50,6 +52,8 @@ public class RealTimeHandler extends UnicastRemoteObject implements ClientCallba
 
     @Override
     public void onAddedToGroup(UserDTO newGroup) throws RemoteException {
+        // [SỬA LỖI REALTIME NHÓM]
+        // Khi được thêm vào nhóm, gọi hàm này để hiển thị nhóm lên Sidebar ngay lập tức
         Platform.runLater(() -> mainController.updateFriendInList(newGroup));
     }
 }
