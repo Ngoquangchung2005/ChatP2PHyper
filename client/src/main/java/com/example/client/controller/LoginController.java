@@ -9,6 +9,7 @@ import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
+import com.example.client.util.NetworkUtil; // Import mới
 
 public class LoginController {
 
@@ -36,32 +37,30 @@ public class LoginController {
         }
 
         try {
-//            // --- SỬA ĐOẠN NÀY ---
-//            // Code cũ: String myIp = "127.0.0.1";
-//
-//            // Code mới: Tự động lấy IP LAN của máy đang chạy Client
-//            String myIp = InetAddress.getLocalHost().getHostAddress();
-//
-//            System.out.println("IP của tôi là: " + myIp); // In ra để kiểm tra
-            // Lấy IP thật của máy (tạm thời để localhost nếu chạy 1 máy)
-            String myIp = "127.0.0.1";
-            int myPort = generateRandomPort(); // <--- Tạo port mới
+// 1. Tự động lấy IP thật của máy
+            String myIp = NetworkUtil.getMyLanIp();
+            int myPort = generateRandomPort();
+
+            System.out.println("My P2P Address: " + myIp + ":" + myPort);
+
 
             // GỌI RMI SANG SERVER
             UserDTO user = RmiClient.getAuthService().login(username, password, myIp, myPort);
             if (user != null) {
-                SessionStore.currentUser = user;
-                SessionStore.p2pPort = myPort; // <--- Lưu lại để MainController dùng
+                // Cập nhật lại thông tin chính xác vào Store
+                user.setLastIp(myIp);
+                user.setLastPort(myPort);
 
-                // Chuyển sang màn hình Chat chính
+                SessionStore.currentUser = user;
+                SessionStore.p2pPort = myPort;
+
                 Navigation.switchScene(event, "/view/main-view.fxml", "Hybrid Messenger");
             } else {
                 showAlert("Thất bại", "Sai tên đăng nhập hoặc mật khẩu!");
             }
-
         } catch (Exception e) {
             e.printStackTrace();
-            showAlert("Lỗi mạng", "Không thể kết nối tới Server: " + e.getMessage());
+            showAlert("Lỗi mạng", "Không thể kết nối tới Server. Kiểm tra file client.properties!");
         }
     }
 

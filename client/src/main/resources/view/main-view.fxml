@@ -41,6 +41,8 @@
             <Label fx:id="currentChatTitle" text="Tên người chat" textFill="black">
                 <font><Font name="Segoe UI Bold" size="18.0" /></font>
             </Label>
+            <Button text="📞 Gọi điện" onAction="#handleVoiceCall"
+                    style="-fx-background-color: #4cd137; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;"/>
         </HBox>
 
         <ScrollPane fx:id="msgScrollPane" fitToWidth="true" hbarPolicy="NEVER"
@@ -52,6 +54,10 @@
 
         <HBox alignment="CENTER_LEFT" spacing="10" styleClass="input-box">
             <padding><Insets bottom="15" left="15" right="15" top="15" /></padding>
+
+            <Button text="📎" onAction="#handleSendFile" styleClass="btn-link"
+                    style="-fx-font-size: 20px; -fx-padding: 0 10 0 0;" />
+
             <TextField fx:id="inputField" onAction="#handleSend" promptText="Nhập tin nhắn..."
                        styleClass="input-field" HBox.hgrow="ALWAYS" />
             <Button defaultButton="true" onAction="#handleSend" styleClass="btn-primary" text="Gửi" />

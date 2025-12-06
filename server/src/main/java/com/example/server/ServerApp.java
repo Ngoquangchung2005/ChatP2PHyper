@@ -7,17 +7,30 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.io.InputStream;
+import java.util.Properties;
 
 public class ServerApp {
     public static void main(String[] args) {
         try {
-      // Thay "192.168.1.50" bằng IP thật của Máy A mà bạn vừa tìm được ở Bước 1 Cấu hình chạy 2 máy
-        //        System.setProperty("java.rmi.server.hostname", "192.168.1.50"); Cấu hình chạy 2 máy
-            // 1. [FIX LỖI] RESET TRẠNG THÁI ONLINE CỦA TẤT CẢ USER KHI KHỞI ĐỘNG SERVER
-            resetAllUsersOffline();
-            // -------------------------------------------------------------------------
+            // 1. Đọc cấu hình từ server.properties
+            Properties props = new Properties();
+            try (InputStream in = ServerApp.class.getClassLoader().getResourceAsStream("server.properties")) {
+                if (in != null) props.load(in);
+            }
 
-            int port = 1099;
+            // Lấy IP từ file cấu hình (nếu không có thì mặc định localhost)
+            String serverHostname = props.getProperty("server.hostname", "localhost");
+            String serverPortStr = props.getProperty("server.rmi.port", "1099");
+            int port = Integer.parseInt(serverPortStr);
+
+            // 2. Cấu hình RMI Hostname (QUAN TRỌNG: Để Client từ máy khác gọi được)
+            System.setProperty("java.rmi.server.hostname", serverHostname);
+
+            // 3. Reset trạng thái user (như code cũ của bạn)
+            resetAllUsersOffline();
+
+            // 4. Khởi tạo Registry
             Registry registry = LocateRegistry.createRegistry(port);
 
             registry.rebind("AuthService", new AuthServiceImpl());
@@ -26,7 +39,9 @@ public class ServerApp {
             registry.rebind("MessageService", new MessageServiceImpl());
             registry.rebind("DirectoryService", new DirectoryServiceImpl());
 
-            System.out.println("Server đang chạy tại port: " + port);
+            System.out.println("=== SERVER ĐANG CHẠY ===");
+            System.out.println("Host: " + serverHostname);
+            System.out.println("Port: " + port);
 
             // Giữ server chạy
             Thread.currentThread().join();
@@ -36,17 +51,11 @@ public class ServerApp {
         }
     }
 
-    // --- HÀM MỚI ĐỂ RESET DB ---
     private static void resetAllUsersOffline() {
-        String sql = "UPDATE users SET is_online = FALSE";
+        // (Giữ nguyên code reset DB của bạn)
         try (Connection conn = Database.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-
-            int count = ps.executeUpdate();
-            System.out.println("Đã reset trạng thái Offline cho " + count + " user.");
-
-        } catch (Exception e) {
-            System.err.println("Lỗi khi reset trạng thái user: " + e.getMessage());
-        }
+             PreparedStatement ps = conn.prepareStatement("UPDATE users SET is_online = FALSE")) {
+            ps.executeUpdate();
+        } catch (Exception e) { e.printStackTrace(); }
     }
 }

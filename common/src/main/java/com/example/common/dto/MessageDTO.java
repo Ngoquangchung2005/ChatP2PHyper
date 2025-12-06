@@ -6,14 +6,26 @@ import java.time.LocalDateTime;
 public class MessageDTO implements Serializable {
     private static final long serialVersionUID = 1L;
 
+    // Thêm các trạng thái cuộc gọi vào Enum
+    public enum MessageType {
+        TEXT, IMAGE, FILE,
+        CALL_REQ,    // Yêu cầu gọi
+        CALL_ACCEPT, // Chấp nhận
+        CALL_DENY,   // Từ chối
+        CALL_END     // Kết thúc cuộc gọi
+    }
+
     private long id;
     private long conversationId;
     private long senderId;
-    private String senderName; // Kèm tên người gửi để hiện thị trong nhóm
+    private String senderName;
     private String content;
     private LocalDateTime createdAt;
 
-    // Type: TEXT, FILE, IMAGE... (đơn giản ta dùng String trước)
+    // --- CÁC TRƯỜNG MỚI ---
+    private MessageType type = MessageType.TEXT; // Mặc định là Text
+    private byte[] fileData;  // Dữ liệu file (ảnh/tài liệu)
+    private String fileName;  // Tên file gốc (ví dụ: hinh_anh.jpg)
 
     public MessageDTO() {}
 
@@ -30,4 +42,12 @@ public class MessageDTO implements Serializable {
     public void setContent(String content) { this.content = content; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    // Getter/Setter cho trường mới
+    public MessageType getType() { return type; }
+    public void setType(MessageType type) { this.type = type; }
+    public byte[] getFileData() { return fileData; }
+    public void setFileData(byte[] fileData) { this.fileData = fileData; }
+    public String getFileName() { return fileName; }
+    public void setFileName(String fileName) { this.fileName = fileName; }
 }
