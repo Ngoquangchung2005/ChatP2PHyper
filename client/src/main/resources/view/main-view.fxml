@@ -10,49 +10,59 @@
 <?import javafx.scene.image.ImageView?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
-<?import javafx.scene.layout.Region?>
 <?import javafx.scene.shape.Circle?>
 <?import javafx.scene.text.Font?>
 
-<BorderPane prefHeight="600.0" prefWidth="950.0" stylesheets="@../styles.css"
+<BorderPane fx:id="mainBorderPane" prefHeight="650.0" prefWidth="1000.0" stylesheets="@../styles.css"
             xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.example.client.controller.MainController">
 
     <left>
-        <VBox prefWidth="300.0" spacing="10.0" styleClass="sidebar">
-            <padding><Insets bottom="10" left="10" right="10" top="15"/></padding>
+        <VBox prefWidth="320.0" spacing="15.0" styleClass="sidebar">
+            <padding><Insets bottom="15" left="15" right="15" top="20"/></padding>
 
-            <HBox alignment="CENTER_LEFT" spacing="10.0">
-                <ImageView fx:id="myAvatarView" fitHeight="40.0" fitWidth="40.0" pickOnBounds="true" preserveRatio="true">
-                    <clip><Circle centerX="20" centerY="20" radius="20" /></clip>
-                </ImageView>
+            <HBox alignment="CENTER_LEFT" spacing="12.0">
+                <StackPane>
+                    <Circle radius="22.5" fill="#3e4042" />
 
-                <Label fx:id="myDisplayName" text="Chat" textFill="#e4e6eb">
-                    <font><Font name="Segoe UI Bold" size="20.0"/></font>
-                </Label>
+                    <ImageView fx:id="myAvatarView" fitHeight="45.0" fitWidth="45.0" pickOnBounds="true" preserveRatio="false">
+                        <clip><Circle centerX="22.5" centerY="22.5" radius="22.5" /></clip>
+                    </ImageView>
+
+                    <Circle radius="6" fill="#31a24c" stroke="#242526" strokeWidth="2" StackPane.alignment="BOTTOM_RIGHT"/>
+                </StackPane>
+
+                <VBox alignment="CENTER_LEFT">
+                    <Label fx:id="myDisplayName" text="Tôi" textFill="#e4e6eb">
+                        <font><Font name="Segoe UI Bold" size="22.0"/></font>
+                    </Label>
+                    <Label text="Trực tuyến" textFill="#b0b3b8" style="-fx-font-size: 12px;"/>
+                </VBox>
 
                 <Region HBox.hgrow="ALWAYS" />
 
                 <Button onAction="#handleOpenProfile" styleClass="btn-icon" text="⚙">
-                    <tooltip><Tooltip text="Hồ sơ cá nhân"/></tooltip>
+                    <tooltip><Tooltip text="Cài đặt hồ sơ"/></tooltip>
                 </Button>
             </HBox>
 
-            <TextField promptText="Tìm kiếm trên Messenger" styleClass="input-field" />
+            <TextField promptText="Tìm kiếm trên Messenger..." styleClass="input-field"
+                       style="-fx-background-radius: 20; -fx-padding: 8 15;"/>
 
             <ListView fx:id="conversationList" styleClass="list-view" VBox.vgrow="ALWAYS"/>
 
-            <HBox alignment="CENTER" spacing="15.0">
+            <HBox alignment="CENTER" spacing="20.0" style="-fx-padding: 10 0 0 0;">
                 <Button onAction="#handleAddFriend" styleClass="btn-icon" text="➕">
-                    <tooltip><Tooltip text="Thêm bạn"/></tooltip>
+                    <tooltip><Tooltip text="Thêm bạn bè"/></tooltip>
                 </Button>
                 <Button onAction="#handleShowRequests" styleClass="btn-icon" text="🔔">
                     <tooltip><Tooltip text="Lời mời kết bạn"/></tooltip>
                 </Button>
                 <Button onAction="#handleCreateGroup" styleClass="btn-icon" text="👥">
-                    <tooltip><Tooltip text="Tạo nhóm chat"/></tooltip>
+                    <tooltip><Tooltip text="Tạo nhóm chat mới"/></tooltip>
                 </Button>
             </HBox>
         </VBox>
@@ -60,51 +70,45 @@
 
     <center>
         <StackPane>
-            <VBox fx:id="welcomeArea" alignment="CENTER" spacing="10" style="-fx-background-color: #18191a;">
-                <Label text="Chào mừng đến với Hybrid Messenger!" textFill="#e4e6eb">
-                    <font><Font name="Segoe UI Bold" size="22.0"/></font>
+            <VBox fx:id="welcomeArea" alignment="CENTER" spacing="15" style="-fx-background-color: #18191a;">
+                <Label text="Chào mừng đến với Hybrid Messenger" textFill="#e4e6eb">
+                    <font><Font name="Segoe UI Bold" size="24.0"/></font>
                 </Label>
-                <Label text="Hãy chọn một người bạn để bắt đầu trò chuyện." textFill="#b0b3b8"/>
+                <Label text="Hãy chọn một đoạn chat để bắt đầu trò chuyện." textFill="#b0b3b8" />
             </VBox>
 
             <VBox fx:id="chatArea" styleClass="chat-area" visible="false">
-                <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="chat-header">
-                    <padding><Insets bottom="10" left="15" right="15" top="10"/></padding>
-
+                <HBox alignment="CENTER_LEFT" spacing="15.0" styleClass="chat-header">
                     <VBox>
                         <Label fx:id="currentChatTitle" text="Tên Người Dùng" textFill="#e4e6eb">
-                            <font><Font name="Segoe UI Bold" size="16.0"/></font>
+                            <font><Font name="Segoe UI Bold" size="18.0"/></font>
                         </Label>
-                        <Label text="Đang hoạt động" textFill="#31a24c" style="-fx-font-size: 12px;"/>
+                        <Label text="Đang hoạt động" textFill="#31a24c" style="-fx-font-size: 12px; -fx-font-weight: bold;"/>
                     </VBox>
 
                     <Region HBox.hgrow="ALWAYS" />
 
-                    <Button onAction="#handleVoiceCall" styleClass="btn-icon" text="📹">
+                    <Button onAction="#handleVoiceCall" styleClass="btn-icon" text="📹" style="-fx-font-size: 20px; -fx-text-fill: #0084ff;">
                         <tooltip><Tooltip text="Gọi Video"/></tooltip>
                     </Button>
-                    <Button styleClass="btn-icon" text="ℹ" />
+
+                    <Button onAction="#handleToggleInfo" styleClass="btn-icon" text="ℹ" style="-fx-font-size: 20px;"/>
                 </HBox>
 
                 <ScrollPane fx:id="msgScrollPane" fitToWidth="true" hbarPolicy="NEVER" styleClass="scroll-pane" vbarPolicy="AS_NEEDED" VBox.vgrow="ALWAYS">
-                    <VBox fx:id="msgContainer" spacing="5.0" styleClass="msg-container">
-                        <padding><Insets bottom="20" left="20" right="20" top="20"/></padding>
-                    </VBox>
+                    <VBox fx:id="msgContainer" spacing="8.0" styleClass="msg-container" />
                 </ScrollPane>
 
                 <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="input-box">
                     <Button onAction="#handleSendFile" styleClass="btn-icon" text="🖼">
                         <tooltip><Tooltip text="Gửi ảnh/file"/></tooltip>
                     </Button>
-
                     <Button fx:id="micBtn" onMousePressed="#startRecording" onMouseReleased="#stopAndSendAudio" styleClass="btn-icon" text="🎤">
                         <tooltip><Tooltip text="Giữ để ghi âm"/></tooltip>
                     </Button>
-
-                    <TextField fx:id="inputField" onAction="#handleSend" promptText="Nhập tin nhắn..." styleClass="input-field" HBox.hgrow="ALWAYS" />
-
-                    <Button defaultButton="true" onAction="#handleSend" styleClass="btn-icon" text="➤" style="-fx-text-fill: #0084ff; -fx-font-size: 20px;">
-                        <tooltip><Tooltip text="Gửi"/></tooltip>
+                    <TextField fx:id="inputField" onAction="#handleSend" promptText="Aa" styleClass="input-field" HBox.hgrow="ALWAYS" />
+                    <Button defaultButton="true" onAction="#handleSend" styleClass="btn-icon" text="➤" style="-fx-text-fill: #0084ff; -fx-font-size: 22px;">
+                        <tooltip><Tooltip text="Gửi tin nhắn"/></tooltip>
                     </Button>
                 </HBox>
             </VBox>

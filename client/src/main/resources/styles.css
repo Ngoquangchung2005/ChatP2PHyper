@@ -1,129 +1,240 @@
-/* --- DARK THEME MESSENGER STYLE --- */
+/* --- MODERN DARK MESSENGER THEME --- */
+
+/* Màu nền chủ đạo */
 .root {
     -fx-font-family: 'Segoe UI', sans-serif;
-    -fx-background-color: #18191a; /* Nền tối Facebook */
+    -fx-background-color: #18191a; /* Nền tối chuẩn Messenger */
+    -fx-text-fill: #e4e6eb;
 }
 
-/* 1. THANH CUỘN (SCROLL BAR) - Ẩn hoặc làm đẹp */
+/* --- THANH CUỘN (SCROLL BAR) --- */
+/* Làm thanh cuộn nhỏ và hiện đại hơn */
 .scroll-pane {
     -fx-background-color: transparent;
-    -fx-background: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+.scroll-pane > .viewport {
+    -fx-background-color: transparent;
 }
 .scroll-bar:vertical, .scroll-bar:horizontal {
     -fx-background-color: transparent;
+    -fx-pref-width: 10;
+}
+.scroll-bar:vertical .track, .scroll-bar:horizontal .track {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
 }
 .scroll-bar:vertical .thumb, .scroll-bar:horizontal .thumb {
     -fx-background-color: #3e4042;
     -fx-background-radius: 5em;
 }
-
-/* 2. SIDEBAR (Danh sách bạn bè) */
-.sidebar {
-    -fx-background-color: #242526; /* Màu xám đậm hơn nền */
-    -fx-border-color: #393a3b;
-    -fx-border-width: 0 1 0 0; /* Chỉ kẻ đường bên phải */
+.scroll-bar .increment-button, .scroll-bar .decrement-button {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
 }
 
+/* --- SIDEBAR (DANH SÁCH BẠN BÈ) --- */
+.sidebar {
+    -fx-background-color: #242526; /* Sáng hơn nền chính một chút */
+    -fx-border-color: #393a3b;
+    -fx-border-width: 0 1 0 0; /* Chỉ kẻ viền phải */
+}
+
+/* List View trong suốt */
+.list-view {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 5;
+}
 .list-cell {
     -fx-background-color: transparent;
     -fx-text-fill: #e4e6eb;
-    -fx-padding: 10px;
+    -fx-padding: 5 10 5 10; /* Top Right Bottom Left */
+    -fx-background-radius: 10px; /* Bo góc khi hover */
 }
-.list-cell:filled:selected, .list-cell:filled:hover {
-    -fx-background-color: #3a3b3c; /* Hiệu ứng hover/select */
-    -fx-background-radius: 10px;
-}
-.list-view {
+.list-cell:empty {
     -fx-background-color: transparent;
-    -fx-padding: 10px;
+}
+/* Hiệu ứng hover và selected */
+.list-cell:filled:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.1);
+}
+.list-cell:filled:selected {
+    -fx-background-color: rgba(45, 136, 255, 0.2); /* Xanh nhạt */
 }
 
-/* 3. CHAT AREA */
+/* --- CHAT AREA --- */
 .chat-area {
     -fx-background-color: #18191a;
 }
 .chat-header {
     -fx-background-color: #242526;
-    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.3), 5, 0, 0, 2);
     -fx-border-color: #393a3b;
-    -fx-border-width: 0 0 1 0;
-}
-.msg-container {
-    -fx-background-color: transparent;
+    -fx-border-width: 0 0 1 0; /* Kẻ viền dưới */
+    -fx-padding: 10 20;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.2), 5, 0, 0, 2);
 }
 
-/* 4. INPUT FIELD (Ô nhập liệu) */
+/* Vùng chứa tin nhắn */
+.msg-container {
+    -fx-background-color: transparent;
+    -fx-padding: 20;
+}
+
+/* --- INPUT BOX (VÙNG NHẬP LIỆU) --- */
 .input-box {
     -fx-background-color: #242526;
     -fx-padding: 15;
+    -fx-spacing: 10;
+    -fx-alignment: CENTER_LEFT;
 }
+
+/* Ô nhập tin nhắn bo tròn như con nhộng */
 .input-field {
     -fx-background-color: #3a3b3c;
     -fx-text-fill: #e4e6eb;
+    -fx-prompt-text-fill: #b0b3b8;
     -fx-background-radius: 20px;
     -fx-border-width: 0;
     -fx-padding: 10 15;
     -fx-font-size: 14px;
 }
 .input-field:focused {
-    -fx-background-color: #4e4f50;
+    -fx-background-color: #4e4f50; /* Sáng hơn khi focus */
 }
 
-/* 5. BUTTONS */
-.btn-primary { /* Nút Gửi/Login */
+/* --- BUTTONS --- */
+.btn-primary {
     -fx-background-color: #0084ff; /* Xanh Messenger */
     -fx-text-fill: white;
     -fx-font-weight: bold;
     -fx-background-radius: 20px;
     -fx-cursor: hand;
-    -fx-padding: 8 15;
+    -fx-padding: 8 20;
+    -fx-font-size: 14px;
 }
 .btn-primary:hover {
     -fx-background-color: #0073e6;
 }
 
-.btn-icon { /* Nút icon (Mic, File, Call) */
+/* Nút icon tròn (Mic, File, Call) */
+.btn-icon {
     -fx-background-color: transparent;
     -fx-text-fill: #0084ff;
     -fx-font-size: 18px;
     -fx-cursor: hand;
-    -fx-padding: 5;
-    -fx-border-radius: 50%;
+    -fx-padding: 8;
+    -fx-background-radius: 50%;
+    -fx-min-width: 40px;
+    -fx-min-height: 40px;
 }
 .btn-icon:hover {
-    -fx-background-color: #3a3b3c;
-    -fx-background-radius: 50%;
+    -fx-background-color: rgba(255,255,255,0.1);
 }
 
-/* 6. BONG BÓNG CHAT */
+/* --- BONG BÓNG CHAT (CHAT BUBBLES) --- */
+/* Tin nhắn của mình (Xanh) */
 .bubble-me {
     -fx-background-color: #0084ff;
-    -fx-background-radius: 18px 18px 4px 18px; /* Bo tròn kiểu Messenger */
+    -fx-background-radius: 18px 18px 4px 18px; /* Bo góc tạo hiệu ứng đuôi */
     -fx-padding: 10 15;
+    -fx-max-width: 400px;
 }
+.text-me {
+    -fx-fill: white;
+    -fx-font-size: 15px;
+}
+
+/* Tin nhắn người khác (Xám) */
 .bubble-other {
     -fx-background-color: #3e4042;
     -fx-background-radius: 18px 18px 18px 4px;
     -fx-padding: 10 15;
-}
-.text-me {
-    -fx-fill: white;
-    -fx-font-size: 14px;
+    -fx-max-width: 400px;
 }
 .text-other {
     -fx-fill: #e4e6eb;
-    -fx-font-size: 14px;
+    -fx-font-size: 15px;
 }
+
+/* Nhãn thời gian nhỏ */
 .time-label {
     -fx-text-fill: #b0b3b8;
     -fx-font-size: 10px;
-    -fx-padding: 2 0 0 0;
+    -fx-padding: 2 5 0 5;
 }
 
-/* Login Form Dark */
-.login-container {
-    -fx-background-color: #242526;
-    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.5), 15, 0, 0, 0);
+/* Badge tin nhắn chưa đọc (Đỏ) */
+.unread-badge {
+    -fx-background-color: #e41e3f;
+    -fx-text-fill: white;
+    -fx-background-radius: 10;
+    -fx-padding: 2 6;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
 }
-.text-header { -fx-fill: #e4e6eb; }
-.text-sub { -fx-fill: #b0b3b8; }
+/* --- INFO SIDEBAR (BÊN PHẢI) --- */
+.info-sidebar {
+    -fx-background-color: #18191a;
+    -fx-border-color: #393a3b;
+    -fx-border-width: 0 0 0 1; /* Chỉ kẻ viền bên trái ngăn cách với chat */
+}
+
+/* Nút chức năng tròn (Profile, Mute...) */
+.btn-circle-action {
+    -fx-background-color: #3a3b3c;
+    -fx-text-fill: #e4e6eb;
+    -fx-background-radius: 50%;
+    -fx-min-width: 40px;
+    -fx-min-height: 40px;
+    -fx-font-size: 16px;
+    -fx-cursor: hand;
+}
+.btn-circle-action:hover {
+    -fx-background-color: #4e4f50;
+}
+
+/* Menu item giống danh sách */
+.menu-item-btn {
+    -fx-background-color: transparent;
+    -fx-text-fill: #e4e6eb;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-padding: 15 20;
+    -fx-cursor: hand;
+    -fx-alignment: CENTER_LEFT;
+}
+.menu-item-btn:hover {
+    -fx-background-color: #3a3b3c;
+}
+
+/* Accordion (TitledPane) Styling */
+.titled-pane {
+    -fx-text-fill: #e4e6eb;
+}
+.titled-pane > .title {
+    -fx-background-color: transparent;
+    -fx-padding: 15 20;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+}
+.titled-pane > .title:hover {
+    -fx-background-color: #3a3b3c;
+}
+.titled-pane > .content {
+    -fx-background-color: #18191a;
+    -fx-border-color: transparent;
+}
+
+/* Sub menu items */
+.sub-menu-btn {
+    -fx-background-color: transparent;
+    -fx-text-fill: #b0b3b8;
+    -fx-alignment: CENTER_LEFT;
+    -fx-cursor: hand;
+    -fx-padding: 5 0;
+}
+.sub-menu-btn:hover {
+    -fx-text-fill: #e4e6eb;
+}

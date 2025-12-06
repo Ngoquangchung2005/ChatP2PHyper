@@ -57,6 +57,9 @@ public class AuthServiceImpl extends UnicastRemoteObject implements AuthService 
                     user.setOnline(true);
                     user.setLastIp(clientIp);
                     user.setLastPort(p2pPort);
+                    // [SỬA LỖI TẠI ĐÂY] Lấy thêm Avatar và Status từ DB gán vào UserDTO
+                    user.setAvatarUrl(rs.getString("avatar_url"));
+                    user.setStatusMsg(rs.getString("status_msg"));
                     return user;
                 }
             }
