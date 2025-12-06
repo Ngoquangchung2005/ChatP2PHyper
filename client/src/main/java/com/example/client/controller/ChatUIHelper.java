@@ -13,8 +13,6 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.StackPane; // Import thêm StackPane
-import javafx.scene.layout.Region;    // Import thêm Region
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Text;
@@ -30,7 +28,7 @@ public class ChatUIHelper {
 
     public static void addMessageBubble(VBox msgContainer, ScrollPane msgScrollPane, MessageDTO msg, boolean isMe) {
 
-        // 1. Xử lý Lazy Loading (Nếu có link ảnh nhưng chưa có dữ liệu)
+        // Lazy load nếu có URL mà chưa có data
         if (isMediaMessage(msg) && msg.getFileData() == null && msg.getAttachmentUrl() != null) {
             handleLazyLoading(msgContainer, msgScrollPane, msg, isMe);
             return;
@@ -38,11 +36,9 @@ public class ChatUIHelper {
 
         Node contentNode;
 
-        // 2. Tạo nội dung tin nhắn theo loại
         if (msg.getType() == MessageDTO.MessageType.TEXT) {
             Text text = new Text(msg.getContent());
             text.getStyleClass().add(isMe ? "text-me" : "text-other");
-
             TextFlow textFlow = new TextFlow(text);
             textFlow.setMaxWidth(450);
             contentNode = textFlow;
@@ -57,16 +53,15 @@ public class ChatUIHelper {
             contentNode = createFileNode(msgContainer, msg, isMe);
         }
         else {
+            // Fallback
             Label lbl = new Label(msg.getContent());
             lbl.getStyleClass().add(isMe ? "text-me" : "text-other");
             contentNode = lbl;
         }
 
-        // 3. Đóng gói vào Bong bóng (Bubble)
         VBox bubble = new VBox(contentNode);
         bubble.getStyleClass().add(isMe ? "bubble-me" : "bubble-other");
 
-        // 4. Thêm thời gian & Căn chỉnh
         VBox messageBlock = new VBox(3);
         messageBlock.setAlignment(isMe ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
         messageBlock.getChildren().add(bubble);
@@ -82,7 +77,6 @@ public class ChatUIHelper {
         row.setPadding(new Insets(2, 10, 2, 10));
         row.getChildren().add(messageBlock);
 
-        // 5. Thêm vào giao diện
         Platform.runLater(() -> {
             msgContainer.getChildren().add(row);
             msgContainer.layout();
@@ -91,47 +85,39 @@ public class ChatUIHelper {
         });
     }
 
-    // --- [HÀM SỬA LỖI] TẠO NODE ẢNH ---
+    // --- SỬA LỖI HIỂN THỊ ẢNH TRẮNG ---
     private static Node createImageNode(byte[] imageData) {
         try {
             ByteArrayInputStream bis = new ByteArrayInputStream(imageData);
             Image image = new Image(bis);
             ImageView imageView = new ImageView(image);
 
-            // Thiết lập kích thước hiển thị
             imageView.setFitWidth(280);
             imageView.setPreserveRatio(true);
             imageView.setSmooth(true);
 
-            // [FIX LỖI TRẮNG ẢNH]
-            // Thay vì tính toán clip thủ công (dễ lỗi 0x0), ta dùng StackPane làm container
-            // và Bind kích thước Clip theo kích thước thật của StackPane.
-            StackPane container = new StackPane(imageView);
-
-            // Đảm bảo container ôm sát ảnh
-            container.setMinSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
-            container.setPrefSize(Region.USE_COMPUTED_SIZE, Region.USE_COMPUTED_SIZE);
-            container.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
-
-            // Tạo khung bo tròn
+            // Bo tròn 20px
             Rectangle clip = new Rectangle();
             clip.setArcWidth(20);
             clip.setArcHeight(20);
 
-            // Ràng buộc (Bind) kích thước clip luôn bằng kích thước container
-            clip.widthProperty().bind(container.widthProperty());
-            clip.heightProperty().bind(container.heightProperty());
+            // [FIX] Cập nhật clip theo kích thước thật của ảnh khi layout thay đổi
+            clip.widthProperty().bind(imageView.fitWidthProperty());
+            imageView.layoutBoundsProperty().addListener((obs, oldVal, newVal) -> {
+                clip.setWidth(newVal.getWidth());
+                clip.setHeight(newVal.getHeight());
+            });
 
-            container.setClip(clip);
+            imageView.setClip(clip);
+            return imageView;
 
-            return container;
         } catch (Exception e) {
             e.printStackTrace();
             return new Label("❌ Lỗi hiển thị ảnh");
         }
     }
 
-    // --- CÁC NODE KHÁC (Audio, File) ---
+    // --- XỬ LÝ NÚT PLAY VOICE ---
     private static Node createAudioNode(MessageDTO msg, boolean isMe) {
         Button playBtn = new Button("▶  Tin nhắn thoại");
         String textColor = isMe ? "white" : "#333333";
@@ -139,10 +125,16 @@ public class ChatUIHelper {
 
         playBtn.setOnAction(e -> {
             playBtn.setText("🔊 Đang phát...");
-            playBtn.setDisable(true);
-            AudioHelper.playAudio(msg.getFileData());
+            playBtn.setDisable(true); // Disable để tránh spam click
+
+            // Chạy trong Thread riêng để không đơ UI
             new Thread(() -> {
-                try { Thread.sleep(3000); } catch (Exception ex) {}
+                AudioHelper.playAudio(msg.getFileData());
+                try {
+                    // Ước lượng thời gian chờ hoặc chờ AudioHelper xong
+                    Thread.sleep(2000);
+                } catch (Exception ex) {}
+
                 Platform.runLater(() -> {
                     playBtn.setText("▶  Nghe lại");
                     playBtn.setDisable(false);
@@ -154,13 +146,19 @@ public class ChatUIHelper {
 
     private static Node createFileNode(VBox container, MessageDTO msg, boolean isMe) {
         String fName = msg.getFileName() != null ? msg.getFileName() : "Tài liệu";
+        // Nếu tên file quá dài thì cắt bớt
+        if (fName.length() > 25) fName = fName.substring(0, 22) + "...";
+
         Button downloadBtn = new Button("📄 " + fName);
         String textColor = isMe ? "white" : "#333333";
         downloadBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: " + textColor + "; -fx-cursor: hand; -fx-font-size: 14px;");
 
+        // Cần biến final để dùng trong lambda
+        String finalName = msg.getFileName() != null ? msg.getFileName() : "Tai_lieu";
+
         downloadBtn.setOnAction(event -> {
             FileChooser fileChooser = new FileChooser();
-            fileChooser.setInitialFileName(fName);
+            fileChooser.setInitialFileName(finalName);
             File file = fileChooser.showSaveDialog(downloadBtn.getScene().getWindow());
             if (file != null) {
                 try { Files.write(file.toPath(), msg.getFileData()); } catch (Exception e) { e.printStackTrace(); }
@@ -169,19 +167,15 @@ public class ChatUIHelper {
         return downloadBtn;
     }
 
-    // --- LAZY LOADING (Tải ngầm) ---
     private static void handleLazyLoading(VBox msgContainer, ScrollPane msgScrollPane, MessageDTO msg, boolean isMe) {
-        // Tạo placeholder giữ chỗ
         Label loadingLabel = new Label("⟳ Đang tải...");
         loadingLabel.setStyle("-fx-text-fill: gray; -fx-font-size: 11px;");
 
-        // Đóng gói vào bong bóng giống hệt tin nhắn thật để giữ chỗ layout
         VBox bubble = new VBox(loadingLabel);
         bubble.getStyleClass().add(isMe ? "bubble-me" : "bubble-other");
 
-        VBox messageBlock = new VBox(3);
+        VBox messageBlock = new VBox(bubble);
         messageBlock.setAlignment(isMe ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
-        messageBlock.getChildren().add(bubble);
 
         HBox row = new HBox(messageBlock);
         row.setAlignment(isMe ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
@@ -193,7 +187,6 @@ public class ChatUIHelper {
             msgScrollPane.setVvalue(1.0);
         });
 
-        // Tải dữ liệu thật
         new Thread(() -> {
             try {
                 byte[] downloadedData = RmiClient.getMessageService().downloadFile(msg.getAttachmentUrl());
@@ -202,15 +195,11 @@ public class ChatUIHelper {
                         msg.setFileData(downloadedData);
                         Node realNode;
 
-                        // Tạo nội dung thật
                         if (msg.getType() == MessageDTO.MessageType.IMAGE) realNode = createImageNode(downloadedData);
                         else if (msg.getType() == MessageDTO.MessageType.AUDIO) realNode = createAudioNode(msg, isMe);
                         else realNode = createFileNode(msgContainer, msg, isMe);
 
-                        // Thay thế nội dung trong bong bóng cũ
                         bubble.getChildren().setAll(realNode);
-
-                        // Ép cuộn xuống lại vì kích thước thay đổi
                         msgContainer.layout();
                         msgScrollPane.layout();
                         msgScrollPane.setVvalue(1.0);

@@ -5,18 +5,15 @@ import javafx.application.Platform;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import javafx.scene.image.PixelWriter;
-import javafx.scene.image.WritableImage;
 
 import javax.imageio.ImageIO;
+import java.awt.Dimension;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
-import java.nio.ByteBuffer;
-import java.awt.Dimension;
 
 public class VideoCallManager {
     private DatagramSocket udpSocket;
@@ -24,14 +21,12 @@ public class VideoCallManager {
     private Webcam webcam;
 
     private String targetIp;
-    private int targetPort; // Port video của đối phương
+    private int targetPort;
 
-    // ImageView để hiển thị
     private ImageView myView;
     private ImageView partnerView;
 
-    // Kích thước nén ảnh để gửi qua UDP (64KB max)
-    // 320x240 là đủ cho chat video cơ bản và vừa gói tin UDP
+    // 320x240 là đủ cho chat video P2P UDP
     private static final Dimension RESOLUTION = new Dimension(320, 240);
 
     public void setupUI(ImageView myView, ImageView partnerView) {
@@ -44,42 +39,42 @@ public class VideoCallManager {
         this.targetPort = targetPort;
         this.isCalling = true;
 
-        try {
-            // 1. Cố gắng mở Webcam
-            webcam = Webcam.getDefault();
-            if (webcam != null) {
-                try {
-                    // SỬA: Thêm try-catch riêng cho việc mở webcam
-                    webcam.setViewSize(RESOLUTION);
-                    webcam.open();
-                } catch (com.github.sarxos.webcam.WebcamLockException e) {
-                    System.err.println("[CẢNH BÁO] Webcam đang bị ứng dụng khác sử dụng! Bạn sẽ không gửi được hình ảnh.");
-                    webcam = null; // Đánh dấu là không có webcam để không gửi dữ liệu rác
-                } catch (Exception e) {
-                    System.err.println("[LỖI] Không thể mở Webcam: " + e.getMessage());
-                    webcam = null;
+        // [QUAN TRỌNG] Chạy khởi tạo Webcam trong luồng riêng để không đơ UI
+        new Thread(() -> {
+            try {
+                // 1. Mở Webcam (Hàm này rất tốn thời gian)
+                webcam = Webcam.getDefault();
+                if (webcam != null) {
+                    try {
+                        webcam.setViewSize(RESOLUTION);
+                        webcam.open();
+                    } catch (Exception e) {
+                        System.err.println("[CẢNH BÁO] Không thể mở Webcam (có thể đang được dùng bởi App khác): " + e.getMessage());
+                        webcam = null;
+                    }
+                } else {
+                    System.err.println("Không tìm thấy Webcam!");
                 }
-            } else {
-                System.err.println("Không tìm thấy Webcam!");
+
+                // 2. Mở Socket UDP
+                udpSocket = new DatagramSocket(myVideoPort);
+
+                // 3. Bắt đầu gửi video (nếu webcam mở thành công)
+                if (webcam != null && webcam.isOpen()) {
+                    sendVideo();
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                stopVideo();
             }
+        }).start();
 
-            // 2. Mở Socket UDP (Khác port Audio)
-            udpSocket = new DatagramSocket(myVideoPort);
-
-            // 3. Chạy luồng Gửi và Nhận
-            // Chỉ gửi video nếu webcam mở thành công
-            if (webcam != null && webcam.isOpen()) {
-                new Thread(this::sendVideo).start();
-            }
-
-            // Luôn luôn nhận video từ đối phương (dù mình hỏng cam thì vẫn xem được họ)
-            new Thread(this::receiveVideo).start();
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            stopVideo();
-        }
+        // 4. Luôn chạy luồng nhận video (để xem đối phương dù mình không có cam)
+        new Thread(this::receiveVideo).start();
     }
+
+    // Luồng gửi video đi
     private void sendVideo() {
         try {
             while (isCalling && webcam != null && webcam.isOpen()) {
@@ -93,20 +88,19 @@ public class VideoCallManager {
                     if (myView != null) myView.setImage(fxImage);
                 });
 
-                // Nén ảnh sang JPEG byte array
+                // Nén ảnh sang JPEG
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 ImageIO.write(bImage, "jpg", baos);
                 byte[] data = baos.toByteArray();
 
-                // Lưu ý: Gói tin UDP tối đa khoảng 65KB.
-                // Nếu ảnh > 60KB sẽ bị lỗi. Với 320x240 JPEG thì thường chỉ 10-20KB.
+                // Gửi qua UDP (Giới hạn gói tin UDP ~60KB)
                 if (data.length < 60000) {
                     InetAddress address = InetAddress.getByName(targetIp);
                     DatagramPacket packet = new DatagramPacket(data, data.length, address, targetPort);
                     udpSocket.send(packet);
                 }
 
-                // Giới hạn FPS (khoảng 20-30 FPS)
+                // Giới hạn FPS (~25 FPS)
                 Thread.sleep(40);
             }
         } catch (Exception e) {
@@ -114,12 +108,18 @@ public class VideoCallManager {
         }
     }
 
+    // Luồng nhận video về
     private void receiveVideo() {
-        byte[] buffer = new byte[65000]; // Buffer lớn để chứa ảnh
+        byte[] buffer = new byte[65000]; // Buffer đủ lớn cho 1 frame ảnh
         try {
             while (isCalling) {
+                if (udpSocket == null || udpSocket.isClosed()) {
+                    Thread.sleep(100);
+                    continue;
+                }
+
                 DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
-                udpSocket.receive(packet);
+                udpSocket.receive(packet); // Chặn chờ nhận gói tin
 
                 // Chuyển byte[] thành Image
                 ByteArrayInputStream bais = new ByteArrayInputStream(packet.getData(), 0, packet.getLength());
@@ -140,7 +140,11 @@ public class VideoCallManager {
 
     public void stopVideo() {
         isCalling = false;
-        if (webcam != null) webcam.close();
-        if (udpSocket != null && !udpSocket.isClosed()) udpSocket.close();
+        try {
+            if (webcam != null) webcam.close();
+            if (udpSocket != null && !udpSocket.isClosed()) udpSocket.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }

@@ -52,6 +52,8 @@ public class MainController {
     private final VoiceCallManager voiceCallManager = new VoiceCallManager();
     private VideoCallController currentVideoCallController;
     private boolean isInfoSidebarOpen = false;
+    // THÊM BIẾN NÀY ĐỂ CHẶN SỰ KIỆN CLICK KHI ĐANG SẮP XẾP
+    private boolean isUpdatingList = false;
 
     @FXML
     public void initialize() {
@@ -66,10 +68,180 @@ public class MainController {
             registerRealTimeUpdates();
         }
 
+        // [SỬA ĐOẠN NÀY] Chỉ chuyển chat nếu KHÔNG phải đang cập nhật danh sách tự động
         conversationList.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal != null) switchChat(newVal);
+            if (!isUpdatingList && newVal != null) {
+                switchChat(newVal);
+            }
         });
     }
+
+    // --- CÁC HÀM XỬ LÝ GỬI FILE & AUDIO (ĐÃ SỬA LỖI) ---
+
+    @FXML
+    public void handleSendFile() {
+        if (currentChatUser == null) return;
+        FileChooser fileChooser = new FileChooser();
+        File selectedFile = fileChooser.showOpenDialog(mainBorderPane.getScene().getWindow());
+
+        if (selectedFile != null) {
+            new Thread(() -> {
+                try {
+                    byte[] fileBytes = Files.readAllBytes(selectedFile.toPath());
+                    MessageDTO msg = new MessageDTO();
+                    msg.setSenderId(SessionStore.currentUser.getId());
+                    msg.setSenderName(SessionStore.currentUser.getDisplayName());
+                    msg.setConversationId(activeConversationId);
+                    msg.setCreatedAt(LocalDateTime.now());
+                    msg.setFileData(fileBytes);
+                    msg.setFileName(selectedFile.getName());
+
+                    String lower = selectedFile.getName().toLowerCase();
+                    if (lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".gif")) {
+                        msg.setType(MessageDTO.MessageType.IMAGE);
+                        // [QUAN TRỌNG] Gán nội dung để Server nhận biết đây là ảnh khi load lịch sử
+                        msg.setContent("[Hình ảnh]");
+                    } else {
+                        msg.setType(MessageDTO.MessageType.FILE);
+                        msg.setContent("[Tập tin] " + selectedFile.getName());
+                    }
+
+                    sendP2PMessage(msg);
+                } catch (Exception e) { e.printStackTrace(); }
+            }).start();
+        }
+    }
+
+    @FXML
+    public void stopAndSendAudio(MouseEvent event) {
+        if (currentChatUser == null) return;
+        micBtn.setStyle("-fx-text-fill: #667eea; -fx-font-size: 20px;");
+
+        // Chống click nhầm (quá ngắn)
+        if (System.currentTimeMillis() - recordingStartTime < 500) {
+            audioRecorder.stopRecording();
+            return;
+        }
+
+        byte[] audioData = audioRecorder.stopRecording();
+        if (audioData != null) {
+            new Thread(() -> {
+                MessageDTO msg = new MessageDTO();
+                msg.setSenderId(SessionStore.currentUser.getId());
+                msg.setSenderName(SessionStore.currentUser.getDisplayName());
+                msg.setConversationId(activeConversationId);
+                msg.setCreatedAt(LocalDateTime.now());
+                msg.setType(MessageDTO.MessageType.AUDIO);
+                msg.setFileData(audioData);
+                // [QUAN TRỌNG] Gán nội dung để Server biết là voice
+                msg.setContent("[Tin nhắn thoại]");
+
+                sendP2PMessage(msg);
+            }).start();
+        }
+    }
+
+    // --- XỬ LÝ NHẬN TIN NHẮN REALTIME (ĐÃ SỬA LỖI) ---
+
+    public void onMessageReceived(MessageDTO msg) {
+        Platform.runLater(() -> {
+            // Xử lý các loại tin nhắn gọi Video
+            if (msg.getType() == MessageDTO.MessageType.CALL_REQ) {
+                handleIncomingCall(msg);
+                return;
+            } else if (msg.getType() == MessageDTO.MessageType.CALL_ACCEPT) {
+                UserDTO partner = findUserInList(msg.getSenderId());
+                if (partner != null) openVideoCallWindow(partner.getLastIp(), partner.getLastPort());
+                return;
+            } else if (msg.getType() == MessageDTO.MessageType.CALL_DENY) {
+                Alert a = new Alert(Alert.AlertType.ERROR, "Người kia đã từ chối cuộc gọi.");
+                a.show();
+                return;
+            } else if (msg.getType() == MessageDTO.MessageType.CALL_END) {
+                if (currentVideoCallController != null) {
+                    currentVideoCallController.closeWindow();
+                    currentVideoCallController = null;
+                }
+                if (voiceCallManager.isCalling()) voiceCallManager.stopCall();
+                return;
+            }
+
+            // [LOGIC CHAT]
+            // Nếu đang mở đúng đoạn chat đó -> Hiện tin nhắn luôn
+            if (activeConversationId != -1 && msg.getConversationId() == activeConversationId) {
+                ChatUIHelper.addMessageBubble(msgContainer, msgScrollPane, msg, false);
+                // Đánh dấu đã đọc ngay
+                new Thread(() -> {
+                    try { RmiClient.getMessageService().markAsRead(SessionStore.currentUser.getId(), activeConversationId); } catch (Exception e) {}
+                }).start();
+            }
+
+            // [LOGIC DANH SÁCH] Luôn cập nhật danh sách bên trái (đẩy lên top + badge đỏ)
+            moveUserToTop(msg);
+        });
+    }
+
+    // [FIX HOÀN CHỈNH] Đẩy user lên đầu, giữ selection và KHÔNG làm mất thông báo
+    private void moveUserToTop(MessageDTO msg) {
+        Platform.runLater(() -> {
+            UserDTO targetUser = null;
+            int index = -1;
+
+            // 1. Lưu lại người đang được chọn
+            UserDTO currentSelection = conversationList.getSelectionModel().getSelectedItem();
+
+            // 2. Tìm user
+            for (int i = 0; i < conversationList.getItems().size(); i++) {
+                UserDTO u = conversationList.getItems().get(i);
+                boolean match = false;
+
+                if ("GROUP".equals(u.getUsername())) {
+                    if (u.getId() == msg.getConversationId()) match = true;
+                } else {
+                    if (u.getId() == msg.getSenderId()) match = true;
+                    if (u.getId() == msg.getConversationId() && msg.getSenderId() == SessionStore.currentUser.getId()) match = true;
+                }
+
+                if (match) {
+                    targetUser = u;
+                    index = i;
+                    break;
+                }
+            }
+
+            // 3. Xử lý di chuyển
+            if (targetUser != null && index != -1) {
+                // Tăng unread count
+                boolean isChattingWithThis = (currentChatUser != null && currentChatUser.getId() == targetUser.getId());
+                if (!isChattingWithThis && msg.getSenderId() != SessionStore.currentUser.getId()) {
+                    targetUser.setUnreadCount(targetUser.getUnreadCount() + 1);
+                }
+
+                // [QUAN TRỌNG] Bật cờ để chặn sự kiện switchChat
+                isUpdatingList = true;
+                try {
+                    // Xóa và thêm lại vào đầu
+                    conversationList.getItems().remove(index);
+                    conversationList.getItems().add(0, targetUser);
+
+                    // Khôi phục lựa chọn cũ
+                    if (currentSelection != null) {
+                        conversationList.getSelectionModel().select(currentSelection);
+                    } else {
+                        conversationList.getSelectionModel().clearSelection();
+                    }
+                } finally {
+                    // Tắt cờ để sự kiện click hoạt động lại bình thường
+                    isUpdatingList = false;
+                }
+
+                conversationList.refresh();
+                conversationList.scrollTo(0);
+            }
+        });
+    }
+    // --- CÁC HÀM CŨ GIỮ NGUYÊN (Copy lại các hàm loadAvatar, sendP2PMessage, switchChat...) ---
+    // (Để tiết kiệm không gian, tôi chỉ viết lại các hàm cần sửa, các hàm khác bạn giữ nguyên như code cũ)
 
     public void loadMyAvatar(String url) {
         if (url == null || url.isEmpty()) return;
@@ -91,49 +263,34 @@ public class MainController {
 
     private void registerRealTimeUpdates() {
         try {
-            // Khởi tạo handler để nhận thông báo từ server
             realTimeHandler = new RealTimeHandler(this);
             RmiClient.getAuthService().registerNotification(SessionStore.currentUser.getId(), realTimeHandler);
-            System.out.println("Đã đăng ký Real-time updates.");
-        } catch (Exception e) {
-            System.err.println("Lỗi đăng ký Real-time: " + e.getMessage());
-        }
+        } catch (Exception e) { e.printStackTrace(); }
     }
 
-    // [HÀM QUAN TRỌNG] Cập nhật danh sách khi có sự thay đổi (Online/Offline/Nhóm mới)
     public void updateFriendInList(UserDTO updatedFriend) {
         boolean found = false;
         for (int i = 0; i < conversationList.getItems().size(); i++) {
             UserDTO u = conversationList.getItems().get(i);
-            // Kiểm tra trùng ID
             if (u.getId() == updatedFriend.getId()) {
-                // Cập nhật trạng thái
                 u.setOnline(updatedFriend.isOnline());
                 u.setLastIp(updatedFriend.getLastIp());
                 u.setLastPort(updatedFriend.getLastPort());
                 if (updatedFriend.getAvatarUrl() != null) u.setAvatarUrl(updatedFriend.getAvatarUrl());
                 if (updatedFriend.getStatusMsg() != null) u.setStatusMsg(updatedFriend.getStatusMsg());
-
                 found = true;
                 conversationList.getItems().set(i, u);
-
-                // Nếu đang chat với người này, cập nhật biến currentChatUser
                 if (currentChatUser != null && currentChatUser.getId() == updatedFriend.getId()) {
                     currentChatUser = u;
                 }
                 break;
             }
         }
-        // Nếu chưa có trong list (ví dụ Nhóm mới tạo), thêm vào đầu
-        if (!found) {
-            conversationList.getItems().add(0, updatedFriend);
-        }
+        if (!found) conversationList.getItems().add(0, updatedFriend);
         conversationList.refresh();
     }
 
-    public void addFriendToListDirectly(UserDTO newFriend) {
-        Platform.runLater(() -> updateFriendInList(newFriend));
-    }
+    public void addFriendToListDirectly(UserDTO newFriend) { Platform.runLater(() -> updateFriendInList(newFriend)); }
 
     private void loadFriendListInitial() {
         new Thread(() -> {
@@ -163,13 +320,10 @@ public class MainController {
         currentChatTitle.setText(friendOrGroup.getDisplayName());
         msgContainer.getChildren().clear();
 
-        // Reset số tin nhắn chưa đọc khi bấm vào
         friendOrGroup.setUnreadCount(0);
         conversationList.refresh();
 
-        if (isInfoSidebarOpen) {
-            openInfoSidebar();
-        }
+        if (isInfoSidebarOpen) openInfoSidebar();
 
         new Thread(() -> {
             try {
@@ -205,89 +359,9 @@ public class MainController {
         Platform.runLater(() -> {
             msgScrollPane.layout();
             msgScrollPane.setVvalue(1.0);
-            Platform.runLater(() -> msgScrollPane.setVvalue(1.0));
         });
     }
 
-    // --- XỬ LÝ NHẬN TIN NHẮN (SỬA LỖI THÔNG BÁO) ---
-    public void onMessageReceived(MessageDTO msg) {
-        Platform.runLater(() -> {
-            if (msg.getType() == MessageDTO.MessageType.CALL_REQ) {
-                handleIncomingCall(msg);
-                return;
-            } else if (msg.getType() == MessageDTO.MessageType.CALL_ACCEPT) {
-                UserDTO partner = findUserInList(msg.getSenderId());
-                if (partner != null) openVideoCallWindow(partner.getLastIp(), partner.getLastPort());
-                return;
-            } else if (msg.getType() == MessageDTO.MessageType.CALL_DENY) {
-                Alert a = new Alert(Alert.AlertType.ERROR, "Người kia đã từ chối cuộc gọi.");
-                a.show();
-                return;
-            } else if (msg.getType() == MessageDTO.MessageType.CALL_END) {
-                if (currentVideoCallController != null) {
-                    currentVideoCallController.closeWindow();
-                    currentVideoCallController = null;
-                }
-                if (voiceCallManager.isCalling()) voiceCallManager.stopCall();
-                Alert a = new Alert(Alert.AlertType.INFORMATION, "Cuộc gọi đã kết thúc.");
-                a.show();
-                return;
-            }
-
-            // Xử lý tin nhắn chat
-            if (activeConversationId != -1 && msg.getConversationId() == activeConversationId) {
-                // Đang chat với người này -> Hiện tin nhắn luôn
-                ChatUIHelper.addMessageBubble(msgContainer, msgScrollPane, msg, false);
-                new Thread(() -> {
-                    try { RmiClient.getMessageService().markAsRead(SessionStore.currentUser.getId(), activeConversationId); } catch (Exception e) {}
-                }).start();
-            } else {
-                // Không chat -> Chỉ cần cập nhật list bên trái (logic nằm ở moveUserToTop)
-            }
-
-            // [QUAN TRỌNG] Gọi hàm cập nhật vị trí và số lượng chưa đọc
-            moveUserToTop(msg);
-        });
-    }
-
-    // [SỬA LỖI] Hàm đẩy user lên đầu và tăng số tin nhắn chưa đọc
-    private void moveUserToTop(MessageDTO msg) {
-        for (int i = 0; i < conversationList.getItems().size(); i++) {
-            UserDTO u = conversationList.getItems().get(i);
-            boolean isMatch = false;
-
-            // Tìm đúng người hoặc nhóm trong danh sách
-            if ("GROUP".equals(u.getUsername())) {
-                if (u.getId() == msg.getConversationId()) isMatch = true;
-            } else {
-                if (u.getId() == msg.getSenderId()) isMatch = true;
-            }
-
-            if (isMatch) {
-                // Logic kiểm tra xem có đang chat với người này không
-                boolean isChattingWithThis = false;
-                if (currentChatUser != null) {
-                    // So sánh ID cẩn thận
-                    if (currentChatUser.getId() == u.getId()) {
-                        isChattingWithThis = true;
-                    }
-                }
-
-                // Nếu KHÔNG đang chat với người này thì mới tăng số chưa đọc
-                if (!isChattingWithThis) {
-                    u.setUnreadCount(u.getUnreadCount() + 1);
-                }
-
-                // Đẩy lên đầu danh sách
-                conversationList.getItems().remove(i);
-                conversationList.getItems().add(0, u);
-                conversationList.refresh();
-                break;
-            }
-        }
-    }
-
-    // --- CÁC HÀM GỬI TIN & BACKUP (Giữ nguyên) ---
     private void sendP2PMessage(MessageDTO msg) {
         UserDTO targetCache = currentChatUser;
         boolean isGroup = "GROUP".equals(targetCache.getUsername());
@@ -309,10 +383,8 @@ public class MainController {
             }
         }
 
-        if (msg.getType() != MessageDTO.MessageType.CALL_REQ &&
-                msg.getType() != MessageDTO.MessageType.CALL_ACCEPT &&
-                msg.getType() != MessageDTO.MessageType.CALL_DENY &&
-                msg.getType() != MessageDTO.MessageType.CALL_END) {
+        if (msg.getType() != MessageDTO.MessageType.CALL_REQ && msg.getType() != MessageDTO.MessageType.CALL_ACCEPT &&
+                msg.getType() != MessageDTO.MessageType.CALL_DENY && msg.getType() != MessageDTO.MessageType.CALL_END) {
             ChatUIHelper.addMessageBubble(msgContainer, msgScrollPane, msg, true);
         }
 
@@ -322,6 +394,8 @@ public class MainController {
                 backupMsg.setConversationId(msg.getConversationId());
                 backupMsg.setSenderId(msg.getSenderId());
                 backupMsg.setCreatedAt(msg.getCreatedAt());
+
+                // Lưu nội dung để định danh loại tin nhắn
                 backupMsg.setContent(msg.getContent());
                 backupMsg.setType(msg.getType());
 
@@ -330,6 +404,8 @@ public class MainController {
                     String serverPath = RmiClient.getMessageService().uploadFile(msg.getFileData(), fName);
                     backupMsg.setAttachmentUrl(serverPath);
                     backupMsg.setFileData(null);
+                } else {
+                    backupMsg.setContent(msg.getContent());
                 }
 
                 RmiClient.getMessageService().saveMessage(backupMsg);
@@ -346,8 +422,7 @@ public class MainController {
     @FXML public void handleVoiceCall() {
         if (currentChatUser == null) return;
         if ("GROUP".equals(currentChatUser.getUsername())) {
-            Alert a = new Alert(Alert.AlertType.WARNING, "Chưa hỗ trợ gọi nhóm!");
-            a.show();
+            new Alert(Alert.AlertType.WARNING, "Chưa hỗ trợ gọi nhóm!").show();
             return;
         }
         MessageDTO msg = new MessageDTO();
@@ -396,31 +471,6 @@ public class MainController {
         return null;
     }
 
-    // Các hàm Upload file, Ghi âm, Video Call, UI
-    @FXML public void handleSendFile() {
-        if (currentChatUser == null) return;
-        FileChooser fileChooser = new FileChooser();
-        File selectedFile = fileChooser.showOpenDialog(inputField.getScene().getWindow());
-        if (selectedFile != null) {
-            new Thread(() -> {
-                try {
-                    byte[] fileBytes = Files.readAllBytes(selectedFile.toPath());
-                    MessageDTO msg = new MessageDTO();
-                    msg.setSenderId(SessionStore.currentUser.getId());
-                    msg.setSenderName(SessionStore.currentUser.getDisplayName());
-                    msg.setConversationId(activeConversationId);
-                    msg.setCreatedAt(LocalDateTime.now());
-                    msg.setFileData(fileBytes);
-                    msg.setFileName(selectedFile.getName());
-                    String lower = selectedFile.getName().toLowerCase();
-                    if (lower.endsWith(".png") || lower.endsWith(".jpg")) msg.setType(MessageDTO.MessageType.IMAGE);
-                    else msg.setType(MessageDTO.MessageType.FILE);
-                    sendP2PMessage(msg);
-                } catch (Exception e) {}
-            }).start();
-        }
-    }
-
     @FXML public void handleSend() {
         String text = inputField.getText().trim();
         if (text.isEmpty() || currentChatUser == null) return;
@@ -440,27 +490,6 @@ public class MainController {
         recordingStartTime = System.currentTimeMillis();
         micBtn.setStyle("-fx-text-fill: red; -fx-font-size: 20px;");
         audioRecorder.startRecording();
-    }
-
-    @FXML public void stopAndSendAudio(MouseEvent event) {
-        if (currentChatUser == null) return;
-        micBtn.setStyle("-fx-text-fill: #667eea; -fx-font-size: 20px;");
-        if (System.currentTimeMillis() - recordingStartTime < 500) {
-            audioRecorder.stopRecording(); return;
-        }
-        byte[] audioData = audioRecorder.stopRecording();
-        if (audioData != null) {
-            new Thread(() -> {
-                MessageDTO msg = new MessageDTO();
-                msg.setSenderId(SessionStore.currentUser.getId());
-                msg.setSenderName(SessionStore.currentUser.getDisplayName());
-                msg.setConversationId(activeConversationId);
-                msg.setCreatedAt(LocalDateTime.now());
-                msg.setType(MessageDTO.MessageType.AUDIO);
-                msg.setFileData(audioData);
-                sendP2PMessage(msg);
-            }).start();
-        }
     }
 
     private void openVideoCallWindow(String targetIp, int targetPort) {
@@ -487,7 +516,6 @@ public class MainController {
         msg.setSenderId(SessionStore.currentUser.getId());
         msg.setConversationId(activeConversationId);
         sendP2PMessage(msg);
-        ChatUIHelper.addMessageBubble(msgContainer, msgScrollPane, msg, true);
         currentVideoCallController = null;
     }
 
