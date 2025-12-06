@@ -4,14 +4,18 @@ import java.io.Serializable;
 
 public class UserDTO implements Serializable {
     private static final long serialVersionUID = 1L;
-    private int unreadCount = 0; // [MỚI] Số tin nhắn chưa đọc
+    private int unreadCount = 0;
 
     private long id;
     private String username;
     private String displayName;
     private boolean isOnline;
-    private String lastIp; // IP để kết nối P2P
-    private int lastPort;  // Port để kết nối P2P
+    private String lastIp;
+    private int lastPort;
+
+    // --- [MỚI] ---
+    private String avatarUrl;   // Đường dẫn ảnh đại diện trên Server
+    private String statusMsg;   // Ví dụ: "Đang bận", "Vui vẻ"...
 
     public UserDTO() {}
 
@@ -37,6 +41,12 @@ public class UserDTO implements Serializable {
     public int getUnreadCount() { return unreadCount; }
     public void setUnreadCount(int unreadCount) { this.unreadCount = unreadCount; }
 
+    // [MỚI] Getter/Setter
+    public String getAvatarUrl() { return avatarUrl; }
+    public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
+    public String getStatusMsg() { return statusMsg; }
+    public void setStatusMsg(String statusMsg) { this.statusMsg = statusMsg; }
+
     @Override
-    public String toString() { return displayName; } // Để hiển thị trên ListView
+    public String toString() { return displayName; }
 }

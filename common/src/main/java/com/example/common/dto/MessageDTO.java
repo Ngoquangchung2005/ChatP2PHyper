@@ -9,6 +9,7 @@ public class MessageDTO implements Serializable {
     // Thêm các trạng thái cuộc gọi vào Enum
     public enum MessageType {
         TEXT, IMAGE, FILE,
+        AUDIO,       // <--- THÊM LOẠI NÀY (Tin nhắn thoại)
         CALL_REQ,    // Yêu cầu gọi
         CALL_ACCEPT, // Chấp nhận
         CALL_DENY,   // Từ chối
@@ -26,6 +27,8 @@ public class MessageDTO implements Serializable {
     private MessageType type = MessageType.TEXT; // Mặc định là Text
     private byte[] fileData;  // Dữ liệu file (ảnh/tài liệu)
     private String fileName;  // Tên file gốc (ví dụ: hinh_anh.jpg)
+    // --- [MỚI] TRƯỜNG LƯU ĐƯỜNG DẪN FILE TRÊN SERVER ---
+    private String attachmentUrl;
 
     public MessageDTO() {}
 
@@ -50,4 +53,7 @@ public class MessageDTO implements Serializable {
     public void setFileData(byte[] fileData) { this.fileData = fileData; }
     public String getFileName() { return fileName; }
     public void setFileName(String fileName) { this.fileName = fileName; }
+    // [MỚI] Getter & Setter cho attachmentUrl
+    public String getAttachmentUrl() { return attachmentUrl; }
+    public void setAttachmentUrl(String attachmentUrl) { this.attachmentUrl = attachmentUrl; }
 }

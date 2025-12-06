@@ -20,13 +20,13 @@ public class FriendServiceImpl extends UnicastRemoteObject implements FriendServ
         super();
     }
 
-    // 1. LẤY DANH SÁCH BẠN BÈ (Đã kết bạn + Nhóm chat)
+    // 1. LẤY DANH SÁCH BẠN BÈ
     @Override
     public List<UserDTO> getFriendList(long userId) throws RemoteException {
         List<UserDTO> list = new ArrayList<>();
 
-        // A. LẤY BẠN BÈ TỪ BẢNG FRIENDSHIPS (Status = ACCEPTED)
-        String sqlFriends = "SELECT u.id, u.username, u.display_name, u.is_online, u.last_ip, u.last_port " +
+        // [SỬA] Thêm u.avatar_url và u.status_msg vào câu SELECT
+        String sqlFriends = "SELECT u.id, u.username, u.display_name, u.is_online, u.last_ip, u.last_port, u.avatar_url, u.status_msg " +
                 "FROM users u " +
                 "JOIN friendships f ON u.id = f.friend_id " +
                 "WHERE f.user_id = ? AND f.status = 'ACCEPTED'";
@@ -43,6 +43,11 @@ public class FriendServiceImpl extends UnicastRemoteObject implements FriendServ
                 u.setOnline(rs.getBoolean("is_online"));
                 u.setLastIp(rs.getString("last_ip"));
                 u.setLastPort(rs.getInt("last_port"));
+
+                // [MỚI] Set thêm Avatar và Status
+                u.setAvatarUrl(rs.getString("avatar_url"));
+                u.setStatusMsg(rs.getString("status_msg"));
+
                 list.add(u);
             }
         } catch (SQLException e) {
@@ -71,13 +76,12 @@ public class FriendServiceImpl extends UnicastRemoteObject implements FriendServ
 
         return list;
     }
-
-    // 2. TÌM KIẾM NGƯỜI DÙNG (Để kết bạn)
+    // 2. TÌM KIẾM NGƯỜI DÙNG
     @Override
     public List<UserDTO> searchUsers(String query) throws RemoteException {
         List<UserDTO> results = new ArrayList<>();
-        // Tìm user theo username hoặc display_name, trừ admin hoặc chính mình (xử lý ở client)
-        String sql = "SELECT id, username, display_name FROM users " +
+        // [SỬA] Thêm avatar_url vào SELECT
+        String sql = "SELECT id, username, display_name, avatar_url, status_msg FROM users " +
                 "WHERE (username LIKE ? OR display_name LIKE ?) LIMIT 20";
 
         try (Connection conn = Database.getConnection();
@@ -92,6 +96,11 @@ public class FriendServiceImpl extends UnicastRemoteObject implements FriendServ
                 u.setId(rs.getLong("id"));
                 u.setUsername(rs.getString("username"));
                 u.setDisplayName(rs.getString("display_name"));
+
+                // [MỚI]
+                u.setAvatarUrl(rs.getString("avatar_url"));
+                u.setStatusMsg(rs.getString("status_msg"));
+
                 results.add(u);
             }
         } catch (SQLException e) {

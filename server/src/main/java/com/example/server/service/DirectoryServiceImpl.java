@@ -19,7 +19,8 @@ public class DirectoryServiceImpl extends UnicastRemoteObject implements Directo
 
     @Override
     public UserDTO getUserInfo(long userId) throws RemoteException {
-        String sql = "SELECT id, last_ip, last_port, is_online FROM users WHERE id = ?";
+        // [SỬA] Thêm avatar_url, status_msg
+        String sql = "SELECT id, username, display_name, last_ip, last_port, is_online, avatar_url, status_msg FROM users WHERE id = ?";
         try (Connection conn = Database.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, userId);
@@ -27,9 +28,16 @@ public class DirectoryServiceImpl extends UnicastRemoteObject implements Directo
             if (rs.next()) {
                 UserDTO u = new UserDTO();
                 u.setId(rs.getLong("id"));
+                u.setUsername(rs.getString("username")); // Thêm dòng này nếu thiếu
+                u.setDisplayName(rs.getString("display_name")); // Thêm dòng này
                 u.setLastIp(rs.getString("last_ip"));
                 u.setLastPort(rs.getInt("last_port"));
                 u.setOnline(rs.getBoolean("is_online"));
+
+                // [MỚI]
+                u.setAvatarUrl(rs.getString("avatar_url"));
+                u.setStatusMsg(rs.getString("status_msg"));
+
                 return u;
             }
         } catch (SQLException e) { e.printStackTrace(); }

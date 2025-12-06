@@ -4,36 +4,50 @@ import com.example.common.dto.MessageDTO;
 import com.example.common.service.MessageService;
 import com.example.server.config.Database;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public class MessageServiceImpl extends UnicastRemoteObject implements MessageService {
+    // Thư mục lưu file trên Server
+    private static final String STORAGE_DIR = "server_files";
 
     public MessageServiceImpl() throws RemoteException {
         super();
+        // Tạo thư mục nếu chưa có
+        new File(STORAGE_DIR).mkdirs();
     }
+
 
     @Override
     public void saveMessage(MessageDTO msg) throws RemoteException {
-        String sql = "INSERT INTO messages (conversation_id, sender_id, content, created_at) VALUES (?, ?, ?, ?)";
+        // [CẬP NHẬT] Thêm attachment_url vào SQL
+        String sql = "INSERT INTO messages (conversation_id, sender_id, content, created_at, attachment_url) VALUES (?, ?, ?, ?, ?)";
         try (Connection conn = Database.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, msg.getConversationId());
             ps.setLong(2, msg.getSenderId());
             ps.setString(3, msg.getContent());
             ps.setTimestamp(4, Timestamp.valueOf(msg.getCreatedAt()));
+            // Lưu đường dẫn file (có thể null)
+            ps.setString(5, msg.getAttachmentUrl());
+
             ps.executeUpdate();
-            System.out.println("Đã lưu tin nhắn vào Conversation ID: " + msg.getConversationId());
+            System.out.println("Đã lưu tin nhắn (kèm file: " + (msg.getAttachmentUrl() != null) + ")");
         } catch (SQLException e) { e.printStackTrace(); }
     }
-
     @Override
     public List<MessageDTO> getHistory(long conversationId) throws RemoteException {
         List<MessageDTO> list = new ArrayList<>();
+        // [CẬP NHẬT] Select thêm attachment_url
         String sql = "SELECT m.*, u.display_name FROM messages m " +
                 "JOIN users u ON m.sender_id = u.id " +
                 "WHERE conversation_id = ? ORDER BY created_at ASC LIMIT 50";
@@ -48,10 +62,65 @@ public class MessageServiceImpl extends UnicastRemoteObject implements MessageSe
                 msg.setSenderName(rs.getString("display_name"));
                 msg.setContent(rs.getString("content"));
                 msg.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
+
+                // [MỚI] Lấy đường dẫn file
+                String attachUrl = rs.getString("attachment_url");
+                msg.setAttachmentUrl(attachUrl);
+
+                // Khôi phục loại tin nhắn dựa trên nội dung hoặc file
+                if (attachUrl != null) {
+                    if (msg.getContent().contains("[Hình ảnh]")) msg.setType(MessageDTO.MessageType.IMAGE);
+                    else if (msg.getContent().contains("[Tin nhắn thoại]")) msg.setType(MessageDTO.MessageType.AUDIO);
+                    else msg.setType(MessageDTO.MessageType.FILE);
+
+                    // Lưu ý: Ta KHÔNG tải fileData ngay ở đây để tránh nặng đường truyền
+                    // Client sẽ gọi downloadFile khi cần hiển thị
+                } else {
+                    msg.setType(MessageDTO.MessageType.TEXT);
+                }
+
                 list.add(msg);
             }
         } catch (SQLException e) { e.printStackTrace(); }
         return list;
+    }
+    // --- [MỚI] IMPLEMENT UPLOAD FILE ---
+    @Override
+    public String uploadFile(byte[] fileData, String fileName) throws RemoteException {
+        if (fileData == null || fileData.length == 0) return null;
+
+        try {
+            // Tạo tên file ngẫu nhiên để tránh trùng: uuid_filename
+            String savedName = UUID.randomUUID().toString() + "_" + fileName;
+            File dest = new File(STORAGE_DIR, savedName);
+
+            try (FileOutputStream fos = new FileOutputStream(dest)) {
+                fos.write(fileData);
+            }
+
+            System.out.println("Server đã nhận file: " + savedName);
+            return savedName; // Trả về tên file để lưu vào DB
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            throw new RemoteException("Lỗi lưu file trên server: " + e.getMessage());
+        }
+    }
+
+    // --- [MỚI] IMPLEMENT DOWNLOAD FILE ---
+    @Override
+    public byte[] downloadFile(String serverPath) throws RemoteException {
+        try {
+            File file = new File(STORAGE_DIR, serverPath);
+            if (!file.exists()) return null;
+
+            try (FileInputStream fis = new FileInputStream(file)) {
+                return fis.readAllBytes();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
     @Override

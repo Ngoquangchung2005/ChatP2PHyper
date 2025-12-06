@@ -6,6 +6,8 @@ import com.example.common.service.ClientCallback;
 import com.example.server.config.Database;
 import com.example.server.util.PasswordHasher;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.sql.Connection;
@@ -15,15 +17,18 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class AuthServiceImpl extends UnicastRemoteObject implements AuthService {
 
     // Danh sách lưu "cái loa" (Callback) của các user đang online
     private static final Map<Long, ClientCallback> onlineClients = new ConcurrentHashMap<>();
+    private static final String AVATAR_DIR = "server_files/avatars"; // Thư mục lưu avatar
 
     public AuthServiceImpl() throws RemoteException {
         super();
+        new File(AVATAR_DIR).mkdirs(); // Tạo thư mục nếu chưa có
     }
 
     @Override
@@ -139,22 +144,6 @@ public class AuthServiceImpl extends UnicastRemoteObject implements AuthService 
         } catch (SQLException e) { e.printStackTrace(); }
     }
 
-    private UserDTO getUserInfoFromDB(long userId) {
-        String sql = "SELECT * FROM users WHERE id = ?";
-        try (Connection conn = Database.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setLong(1, userId);
-            ResultSet rs = ps.executeQuery();
-            if (rs.next()) {
-                UserDTO u = new UserDTO(rs.getLong("id"), rs.getString("username"), rs.getString("display_name"));
-                u.setOnline(rs.getBoolean("is_online"));
-                u.setLastIp(rs.getString("last_ip"));
-                u.setLastPort(rs.getInt("last_port"));
-                return u;
-            }
-        } catch (SQLException e) { e.printStackTrace(); }
-        return null;
-    }
 
     @Override
     public boolean register(String u, String p, String d, String e) throws RemoteException {
@@ -175,5 +164,93 @@ public class AuthServiceImpl extends UnicastRemoteObject implements AuthService 
 
     public static ClientCallback getClientCallback(long userId) {
         return onlineClients.get(userId);
+    }
+    @Override
+    public boolean changePassword(long userId, String oldPassword, String newPassword) throws RemoteException {
+        String sqlSelect = "SELECT password_hash FROM users WHERE id = ?";
+        String sqlUpdate = "UPDATE users SET password_hash = ? WHERE id = ?";
+
+        try (Connection conn = Database.getConnection();
+             PreparedStatement psSel = conn.prepareStatement(sqlSelect)) {
+
+            // 1. Kiểm tra mật khẩu cũ
+            psSel.setLong(1, userId);
+            ResultSet rs = psSel.executeQuery();
+            if (rs.next()) {
+                String currentHash = rs.getString("password_hash");
+                if (PasswordHasher.check(oldPassword, currentHash)) {
+                    // 2. Cập nhật mật khẩu mới
+                    try (PreparedStatement psUp = conn.prepareStatement(sqlUpdate)) {
+                        psUp.setString(1, PasswordHasher.hash(newPassword));
+                        psUp.setLong(2, userId);
+                        return psUp.executeUpdate() > 0;
+                    }
+                }
+            }
+        } catch (SQLException e) { e.printStackTrace(); }
+        return false;
+    }
+
+    @Override
+    public boolean updateProfile(long userId, String displayName, String statusMsg, byte[] avatarData, String ext) throws RemoteException {
+        String avatarPath = null;
+
+        // 1. Lưu Avatar nếu có
+        if (avatarData != null && avatarData.length > 0) {
+            try {
+                String fileName = userId + "_" + UUID.randomUUID() + (ext.startsWith(".") ? ext : "." + ext);
+                File file = new File(AVATAR_DIR, fileName);
+                try (FileOutputStream fos = new FileOutputStream(file)) {
+                    fos.write(avatarData);
+                }
+                avatarPath = "avatars/" + fileName; // Lưu đường dẫn tương đối
+            } catch (Exception e) { e.printStackTrace(); return false; }
+        }
+
+        // 2. Cập nhật DB
+        // Nếu avatarPath != null thì update cả avatar, nếu null thì giữ nguyên
+        String sql;
+        if (avatarPath != null) {
+            sql = "UPDATE users SET display_name = ?, status_msg = ?, avatar_url = ? WHERE id = ?";
+        } else {
+            sql = "UPDATE users SET display_name = ?, status_msg = ? WHERE id = ?";
+        }
+
+        try (Connection conn = Database.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, displayName);
+            ps.setString(2, statusMsg);
+
+            if (avatarPath != null) {
+                ps.setString(3, avatarPath);
+                ps.setLong(4, userId);
+            } else {
+                ps.setLong(3, userId);
+            }
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) { e.printStackTrace(); }
+        return false;
+    }
+
+    // (Cần cập nhật hàm getUserInfoFromDB để lấy thêm avatar_url và status_msg)
+    private UserDTO getUserInfoFromDB(long userId) {
+        String sql = "SELECT * FROM users WHERE id = ?";
+        try (Connection conn = Database.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, userId);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                UserDTO u = new UserDTO(rs.getLong("id"), rs.getString("username"), rs.getString("display_name"));
+                u.setOnline(rs.getBoolean("is_online"));
+                u.setLastIp(rs.getString("last_ip"));
+                u.setLastPort(rs.getInt("last_port"));
+
+                // [MỚI]
+                u.setAvatarUrl(rs.getString("avatar_url"));
+                u.setStatusMsg(rs.getString("status_msg"));
+                return u;
+            }
+        } catch (SQLException e) { e.printStackTrace(); }
+        return null;
     }
 }

@@ -20,9 +20,12 @@
     <VBox spacing="0" styleClass="sidebar">
         <HBox alignment="CENTER_LEFT" spacing="10" styleClass="sidebar-header">
             <padding><Insets bottom="15" left="15" right="15" top="15" /></padding>
+            <ImageView fx:id="myAvatarView" fitWidth="40" fitHeight="40" preserveRatio="true"/>
             <Label fx:id="myDisplayName" text="Tên Của Tôi" textFill="#000">
                 <font><Font name="Segoe UI Bold" size="16.0" /></font>
             </Label>
+            <Button text="⚙ Hồ sơ" onAction="#handleOpenProfile"
+                    style="-fx-background-color: white; -fx-border-color: #ddd; -fx-border-radius: 5; -fx-cursor: hand;"/>
         </HBox>
 
         <ListView fx:id="conversationList" styleClass="conv-list" VBox.vgrow="ALWAYS" />
@@ -56,10 +59,14 @@
             <padding><Insets bottom="15" left="15" right="15" top="15" /></padding>
 
             <Button text="📎" onAction="#handleSendFile" styleClass="btn-link"
-                    style="-fx-font-size: 20px; -fx-padding: 0 10 0 0;" />
+                    style="-fx-font-size: 20px; -fx-padding: 0 5 0 0;" />
+
+            <Button fx:id="micBtn" text="🎤" onMousePressed="#startRecording" onMouseReleased="#stopAndSendAudio"
+                    styleClass="btn-link" style="-fx-font-size: 20px; -fx-cursor: hand;" />
 
             <TextField fx:id="inputField" onAction="#handleSend" promptText="Nhập tin nhắn..."
                        styleClass="input-field" HBox.hgrow="ALWAYS" />
+
             <Button defaultButton="true" onAction="#handleSend" styleClass="btn-primary" text="Gửi" />
         </HBox>
     </VBox>
