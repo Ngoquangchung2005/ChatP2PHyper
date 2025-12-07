@@ -27,7 +27,7 @@ public class MessageServiceImpl extends UnicastRemoteObject implements MessageSe
 
     @Override
     public void saveMessage(MessageDTO msg) throws RemoteException {
-        String sql = "INSERT INTO messages (conversation_id, sender_id, content, created_at, attachment_url) VALUES (?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO messages (conversation_id, sender_id, content, created_at, attachment_url, uuid) VALUES (?, ?, ?, ?, ?, ?)";
 
         try (Connection conn = Database.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -38,6 +38,7 @@ public class MessageServiceImpl extends UnicastRemoteObject implements MessageSe
             ps.setString(3, msg.getContent() != null ? msg.getContent() : "");
             ps.setTimestamp(4, Timestamp.valueOf(msg.getCreatedAt()));
             ps.setString(5, msg.getAttachmentUrl());
+            ps.setString(6, msg.getUuid()); // Lưu UUID
 
             int rows = ps.executeUpdate();
             if (rows > 0) {
@@ -47,6 +48,26 @@ public class MessageServiceImpl extends UnicastRemoteObject implements MessageSe
             e.printStackTrace();
             System.err.println(">> Lỗi SQL khi lưu tin nhắn: " + e.getMessage());
         }
+    }
+    // Hàm xử lý Sửa / Thu hồi
+    public void updateMessage(String uuid, String newContent, MessageDTO.MessageType type) throws RemoteException {
+        String sql = "";
+        if (type == MessageDTO.MessageType.RECALL) {
+            sql = "UPDATE messages SET content = 'Tin nhắn đã thu hồi', attachment_url = NULL WHERE uuid = ?";
+        } else if (type == MessageDTO.MessageType.EDIT) {
+            sql = "UPDATE messages SET content = ? WHERE uuid = ?";
+        }
+
+        try (Connection conn = Database.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            if (type == MessageDTO.MessageType.EDIT) {
+                ps.setString(1, newContent);
+                ps.setString(2, uuid);
+            } else {
+                ps.setString(1, uuid);
+            }
+            ps.executeUpdate();
+        } catch (SQLException e) { e.printStackTrace(); }
     }
 
     @Override

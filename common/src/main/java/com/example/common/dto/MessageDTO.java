@@ -2,6 +2,7 @@ package com.example.common.dto;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 public class MessageDTO implements Serializable {
     private static final long serialVersionUID = 1L;
@@ -13,7 +14,8 @@ public class MessageDTO implements Serializable {
         CALL_REQ,    // Yêu cầu gọi
         CALL_ACCEPT, // Chấp nhận
         CALL_DENY,   // Từ chối
-        CALL_END     // Kết thúc cuộc gọi
+        CALL_END ,    // Kết thúc cuộc gọi
+        EDIT, RECALL // <--- THÊM 2 LOẠI NÀY
     }
 
     private long id;
@@ -29,8 +31,12 @@ public class MessageDTO implements Serializable {
     private String fileName;  // Tên file gốc (ví dụ: hinh_anh.jpg)
     // --- [MỚI] TRƯỜNG LƯU ĐƯỜNG DẪN FILE TRÊN SERVER ---
     private String attachmentUrl;
+    // --- THÊM TRƯỜNG MỚI ---
+    private String uuid; // Định danh duy nhất do Client tạo
 
-    public MessageDTO() {}
+    public MessageDTO() {
+        this.uuid = UUID.randomUUID().toString();
+    }
 
     // --- Getters & Setters ---
     public long getId() { return id; }
@@ -56,4 +62,7 @@ public class MessageDTO implements Serializable {
     // [MỚI] Getter & Setter cho attachmentUrl
     public String getAttachmentUrl() { return attachmentUrl; }
     public void setAttachmentUrl(String attachmentUrl) { this.attachmentUrl = attachmentUrl; }
+    // Getter & Setter cho uuid
+    public String getUuid() { return uuid; }
+    public void setUuid(String uuid) { this.uuid = uuid; }
 }

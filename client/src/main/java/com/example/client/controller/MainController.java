@@ -28,6 +28,7 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.nio.file.Files;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -54,6 +55,8 @@ public class MainController {
     private boolean isInfoSidebarOpen = false;
     // THÊM BIẾN NÀY ĐỂ CHẶN SỰ KIỆN CLICK KHI ĐANG SẮP XẾP
     private boolean isUpdatingList = false;
+    // Map để tìm nhanh bong bóng chat dựa trên UUID
+    private final Map<String, VBox> messageUiMap = new HashMap<>();
 
     @FXML
     public void initialize() {
@@ -150,11 +153,12 @@ public class MainController {
         }
     }
 
-    // --- XỬ LÝ NHẬN TIN NHẮN REALTIME (ĐÃ SỬA LỖI) ---
-
+    // --- XỬ LÝ NHẬN TIN NHẮN REALTIME (HOÀN CHỈNH) ---
     public void onMessageReceived(MessageDTO msg) {
         Platform.runLater(() -> {
-            // Xử lý các loại tin nhắn gọi Video
+            // ---------------------------------------------------------
+            // 1. XỬ LÝ CÁC TÍN HIỆU CUỘC GỌI (VIDEO/VOICE)
+            // ---------------------------------------------------------
             if (msg.getType() == MessageDTO.MessageType.CALL_REQ) {
                 handleIncomingCall(msg);
                 return;
@@ -172,20 +176,60 @@ public class MainController {
                     currentVideoCallController = null;
                 }
                 if (voiceCallManager.isCalling()) voiceCallManager.stopCall();
+                Alert a = new Alert(Alert.AlertType.INFORMATION, "Cuộc gọi đã kết thúc.");
+                a.show();
                 return;
             }
 
-            // [LOGIC CHAT]
-            // Nếu đang mở đúng đoạn chat đó -> Hiện tin nhắn luôn
+            // ---------------------------------------------------------
+            // 2. XỬ LÝ THU HỒI & CHỈNH SỬA TIN NHẮN
+            // ---------------------------------------------------------
+            if (msg.getType() == MessageDTO.MessageType.RECALL) {
+                if (messageUiMap.containsKey(msg.getUuid())) {
+                    VBox bubble = messageUiMap.get(msg.getUuid());
+                    // Cập nhật UI thành "Tin nhắn đã thu hồi"
+                    ChatUIHelper.updateBubbleContent(bubble, "🚫 Tin nhắn đã thu hồi", true);
+                }
+                return; // Dừng tại đây, không thêm tin nhắn mới
+            }
+
+            if (msg.getType() == MessageDTO.MessageType.EDIT) {
+                if (messageUiMap.containsKey(msg.getUuid())) {
+                    VBox bubble = messageUiMap.get(msg.getUuid());
+                    // Cập nhật nội dung mới
+                    ChatUIHelper.updateBubbleContent(bubble, msg.getContent(), false);
+                }
+                return; // Dừng tại đây
+            }
+
+            // ---------------------------------------------------------
+            // 3. XỬ LÝ TIN NHẮN CHAT MỚI (TEXT, IMAGE, FILE...)
+            // ---------------------------------------------------------
+
+            // Nếu đang mở đúng cuộc trò chuyện đó thì hiện tin nhắn lên màn hình
             if (activeConversationId != -1 && msg.getConversationId() == activeConversationId) {
-                ChatUIHelper.addMessageBubble(msgContainer, msgScrollPane, msg, false);
-                // Đánh dấu đã đọc ngay
+                // Thêm bong bóng chat vào giao diện
+                VBox bubble = ChatUIHelper.addMessageBubble(msgContainer, msgScrollPane, msg, false);
+
+                // [QUAN TRỌNG] Lưu tham chiếu bong bóng vào Map để sau này còn sửa/xóa
+                if (msg.getUuid() != null) {
+                    messageUiMap.put(msg.getUuid(), bubble);
+                }
+
+                // Đánh dấu đã đọc ngay lập tức (gửi lên Server ngầm)
                 new Thread(() -> {
-                    try { RmiClient.getMessageService().markAsRead(SessionStore.currentUser.getId(), activeConversationId); } catch (Exception e) {}
+                    try {
+                        RmiClient.getMessageService().markAsRead(SessionStore.currentUser.getId(), activeConversationId);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
                 }).start();
             }
 
-            // [LOGIC DANH SÁCH] Luôn cập nhật danh sách bên trái (đẩy lên top + badge đỏ)
+            // ---------------------------------------------------------
+            // 4. CẬP NHẬT DANH SÁCH BẠN BÈ (SIDEBAR)
+            // ---------------------------------------------------------
+            // Đẩy người gửi lên đầu danh sách, hiện chấm đỏ (nếu đang không chat với họ)
             moveUserToTop(msg);
         });
     }
@@ -530,6 +574,58 @@ public class MainController {
         msg.setConversationId(activeConversationId);
         sendP2PMessage(msg);
         currentVideoCallController = null;
+    }
+    // Trong MainController
+    public void handleEditAction(MessageDTO targetMsg) {
+        TextInputDialog dialog = new TextInputDialog(targetMsg.getContent());
+        dialog.setTitle("Chỉnh sửa tin nhắn");
+        dialog.setHeaderText(null);
+        dialog.setContentText("Nội dung mới:");
+
+        dialog.showAndWait().ifPresent(newContent -> {
+            // 1. Gửi P2P báo cho đối phương
+            MessageDTO editMsg = new MessageDTO();
+            editMsg.setType(MessageDTO.MessageType.EDIT);
+            editMsg.setUuid(targetMsg.getUuid()); // Quan trọng: Phải trùng UUID
+            editMsg.setContent(newContent);
+            editMsg.setConversationId(activeConversationId);
+            editMsg.setSenderId(SessionStore.currentUser.getId());
+
+            sendP2PMessage(editMsg); // Gửi đi
+
+            // 2. Cập nhật UI của mình ngay lập tức
+            if (messageUiMap.containsKey(targetMsg.getUuid())) {
+                ChatUIHelper.updateBubbleContent(messageUiMap.get(targetMsg.getUuid()), newContent, false);
+            }
+
+            // 3. Cập nhật DB (Gọi RMI)
+            new Thread(() -> {
+                try {
+                    RmiClient.getMessageService().updateMessage(targetMsg.getUuid(), newContent, MessageDTO.MessageType.EDIT);
+                } catch(Exception e) { e.printStackTrace(); }
+            }).start();
+        });
+    }
+
+    public void handleRecallAction(MessageDTO targetMsg) {
+        // Logic tương tự Edit, nhưng set Type = RECALL
+        MessageDTO recallMsg = new MessageDTO();
+        recallMsg.setType(MessageDTO.MessageType.RECALL);
+        recallMsg.setUuid(targetMsg.getUuid());
+        recallMsg.setConversationId(activeConversationId);
+        recallMsg.setSenderId(SessionStore.currentUser.getId());
+
+        sendP2PMessage(recallMsg);
+
+        if (messageUiMap.containsKey(targetMsg.getUuid())) {
+            ChatUIHelper.updateBubbleContent(messageUiMap.get(targetMsg.getUuid()), "🚫 Tin nhắn đã thu hồi", true);
+        }
+
+        new Thread(() -> {
+            try {
+                RmiClient.getMessageService().updateMessage(targetMsg.getUuid(), null, MessageDTO.MessageType.RECALL);
+            } catch(Exception e) { e.printStackTrace(); }
+        }).start();
     }
 
     @FXML public void handleCreateGroup() { openDialog("/view/create-group.fxml", "Tạo Nhóm"); }

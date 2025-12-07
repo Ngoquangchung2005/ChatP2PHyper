@@ -19,4 +19,6 @@ public interface MessageService extends Remote {
 
     // Tải file từ server về client
     byte[] downloadFile(String serverPath) throws RemoteException;
+    // --- [THÊM DÒNG NÀY ĐỂ SỬA LỖI] ---
+    void updateMessage(String uuid, String newContent, MessageDTO.MessageType type) throws RemoteException;
 }
