@@ -198,7 +198,7 @@ public class AuthServiceImpl extends UnicastRemoteObject implements AuthService 
     public boolean updateProfile(long userId, String displayName, String statusMsg, byte[] avatarData, String ext) throws RemoteException {
         String avatarPath = null;
 
-        // 1. Lưu Avatar nếu có
+        // 1. Lưu Avatar nếu có (Code cũ)
         if (avatarData != null && avatarData.length > 0) {
             try {
                 String fileName = userId + "_" + UUID.randomUUID() + (ext.startsWith(".") ? ext : "." + ext);
@@ -206,12 +206,11 @@ public class AuthServiceImpl extends UnicastRemoteObject implements AuthService 
                 try (FileOutputStream fos = new FileOutputStream(file)) {
                     fos.write(avatarData);
                 }
-                avatarPath = "avatars/" + fileName; // Lưu đường dẫn tương đối
+                avatarPath = "avatars/" + fileName;
             } catch (Exception e) { e.printStackTrace(); return false; }
         }
 
-        // 2. Cập nhật DB
-        // Nếu avatarPath != null thì update cả avatar, nếu null thì giữ nguyên
+        // 2. Cập nhật DB (Code cũ)
         String sql;
         if (avatarPath != null) {
             sql = "UPDATE users SET display_name = ?, status_msg = ?, avatar_url = ? WHERE id = ?";
@@ -230,7 +229,24 @@ public class AuthServiceImpl extends UnicastRemoteObject implements AuthService 
             } else {
                 ps.setLong(3, userId);
             }
-            return ps.executeUpdate() > 0;
+
+            int rows = ps.executeUpdate();
+
+            // --- [THÊM ĐOẠN NÀY ĐỂ REALTIME] ---
+            if (rows > 0) {
+                // A. Lấy thông tin mới nhất từ DB
+                UserDTO updatedUser = getUserInfoFromDB(userId);
+
+                // B. Bắn thông báo cho toàn bộ bạn bè
+                if (updatedUser != null) {
+                    // Cần set Online = true để bạn bè thấy nick sáng
+                    updatedUser.setOnline(true);
+                    notifyFriendsOnly(updatedUser);
+                }
+                return true;
+            }
+            // ------------------------------------
+
         } catch (SQLException e) { e.printStackTrace(); }
         return false;
     }

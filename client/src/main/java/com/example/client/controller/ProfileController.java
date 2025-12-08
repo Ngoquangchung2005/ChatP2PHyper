@@ -69,6 +69,7 @@ public class ProfileController {
                     if (ok) {
                         SessionStore.currentUser.setDisplayName(name);
                         SessionStore.currentUser.setStatusMsg(status);
+
                         showAlert("Thành công", "Đã cập nhật thông tin!");
                     } else {
                         showAlert("Lỗi", "Không thể cập nhật.");
