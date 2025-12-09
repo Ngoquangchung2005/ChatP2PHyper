@@ -14,4 +14,6 @@ public interface GroupService extends Remote {
 
     // Lấy danh sách các nhóm mà user đang tham gia (Chuyển từ ChatService qua đây luôn cho chuẩn)
     List<UserDTO> getMyGroups(long userId) throws RemoteException;
+    // --- [THÊM MỚI] ---
+    boolean leaveGroup(long userId, long groupId) throws RemoteException;
 }

@@ -49,12 +49,15 @@ public class NavigationHandler {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/view/chat-info.fxml"));
             Parent infoNode = loader.load();
             ChatInfoController infoCtrl = loader.getController();
+
+            // [QUAN TRỌNG] Truyền MainController vào
+            infoCtrl.setMainController(mc);
+
             infoCtrl.setUserInfo(mc.currentChatUser);
             mc.mainBorderPane.setRight(infoNode);
             isInfoSidebarOpen = true;
-        } catch (Exception e) {}
+        } catch (Exception e) { e.printStackTrace(); }
     }
-
     private void openDialog(String fxml, String title) {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource(fxml));

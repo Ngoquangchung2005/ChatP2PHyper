@@ -103,7 +103,12 @@ public class ContactManager {
             }
         });
     }
-
+    public void removeConversation(long id) {
+        Platform.runLater(() -> {
+            mc.conversationList.getItems().removeIf(u -> u.getId() == id);
+            mc.conversationList.refresh();
+        });
+    }
     public UserDTO findUserInList(long userId) {
         for (UserDTO u : mc.conversationList.getItems()) {
             if (u.getId() == userId) return u;

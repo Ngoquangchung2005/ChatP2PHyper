@@ -52,7 +52,6 @@
     </HBox>
 
     <Separator opacity="0.1" />
-
     <ScrollPane fitToWidth="true" styleClass="scroll-pane" VBox.vgrow="ALWAYS">
         <VBox spacing="0">
             <Button alignment="CENTER_LEFT" maxWidth="Infinity" styleClass="menu-item-btn" text="Thông tin về đoạn chat  ›" />
@@ -72,6 +71,14 @@
             </Accordion>
 
             <Button alignment="CENTER_LEFT" maxWidth="Infinity" styleClass="menu-item-btn" text="Quyền riêng tư &amp; hỗ trợ ›" />
+
+            <VBox alignment="CENTER" style="-fx-padding: 20 0 20 0;">
+                <Button fx:id="leaveGroupBtn" text="Rời khỏi nhóm"
+                        onAction="#handleLeaveGroup"
+                        visible="false" managed="false"
+                        style="-fx-background-color: #ffebee; -fx-text-fill: #c62828; -fx-font-weight: bold; -fx-cursor: hand; -fx-background-radius: 20; -fx-padding: 8 20;" />
+            </VBox>
+
         </VBox>
     </ScrollPane>
 </VBox>

@@ -146,7 +146,25 @@ public class MainController {
             } catch (Exception e) {}
         }).start();
     }
+    public void handleGroupLeft(long groupId) {
+        // 1. Xóa khỏi danh sách bên trái
+        getContactManager().removeConversation(groupId);
 
+        // 2. Nếu đang mở đúng nhóm đó thì đóng lại, hiện màn hình chào mừng
+        if (activeConversationId == groupId) {
+            welcomeArea.setVisible(true);
+            chatArea.setVisible(false);
+            currentChatUser = null;
+            activeConversationId = -1;
+
+            // Đóng sidebar thông tin
+            mainBorderPane.setRight(null);
+        }
+
+        // 3. Thông báo
+        Alert a = new Alert(Alert.AlertType.INFORMATION, "Bạn đã rời nhóm thành công.");
+        a.show();
+    }
     public void refreshProfileUI() {
         myDisplayName.setText(SessionStore.currentUser.getDisplayName());
         loadMyAvatar(SessionStore.currentUser.getAvatarUrl());

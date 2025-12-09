@@ -39,13 +39,21 @@ public class ProfileController {
                     byte[] data = RmiClient.getMessageService().downloadFile(me.getAvatarUrl());
                     if (data != null) {
                         Image img = new Image(new ByteArrayInputStream(data));
-                        Platform.runLater(() -> avatarView.setImage(img));
+                        Platform.runLater(() -> {
+                            avatarView.setImage(img);
+
+                            // [QUAN TRỌNG] Đảm bảo ảnh luôn tròn khi load
+                            double r = avatarView.getFitWidth() / 2;
+                            javafx.scene.shape.Circle clip = new javafx.scene.shape.Circle(r, r, r);
+                            avatarView.setClip(clip);
+                        });
                     }
                 } catch (Exception e) {}
             }).start();
         }
-    }
 
+        // Khi chọn ảnh mới từ máy (handleChooseAvatar), cũng cần setClip tương tự:
+    }
     @FXML
     public void handleChooseAvatar() {
         FileChooser fc = new FileChooser();
@@ -55,7 +63,15 @@ public class ProfileController {
             try {
                 newAvatarData = Files.readAllBytes(file.toPath());
                 newAvatarExt = file.getName().substring(file.getName().lastIndexOf("."));
-                avatarView.setImage(new Image(new ByteArrayInputStream(newAvatarData)));
+
+                Image img = new Image(new ByteArrayInputStream(newAvatarData));
+                avatarView.setImage(img);
+
+                // Bo tròn ảnh preview
+                double r = avatarView.getFitWidth() / 2;
+                javafx.scene.shape.Circle clip = new javafx.scene.shape.Circle(r, r, r);
+                avatarView.setClip(clip);
+
             } catch (Exception e) { e.printStackTrace(); }
         }
     }

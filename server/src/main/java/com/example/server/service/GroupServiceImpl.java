@@ -101,6 +101,28 @@ public class GroupServiceImpl extends UnicastRemoteObject implements GroupServic
         } catch (SQLException e) { e.printStackTrace(); }
         return ids;
     }
+    @Override
+    public boolean leaveGroup(long userId, long groupId) throws RemoteException {
+        String sql = "DELETE FROM conversation_members WHERE user_id = ? AND conversation_id = ?";
+        try (Connection conn = Database.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, userId);
+            ps.setLong(2, groupId);
+
+            int rows = ps.executeUpdate();
+            if (rows > 0) {
+                System.out.println("User " + userId + " đã rời nhóm " + groupId);
+
+                // (Tùy chọn) Bạn có thể thêm logic gửi tin nhắn hệ thống báo "User đã rời nhóm" vào đây
+                // Bằng cách gọi MessageService.saveMessage(...)
+
+                return true;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
 
     @Override
     public List<UserDTO> getMyGroups(long userId) throws RemoteException {
