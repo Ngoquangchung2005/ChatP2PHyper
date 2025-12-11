@@ -102,8 +102,37 @@ public class MainController {
                 callHandler.handleCallSignal(msg);
 
             } else {
-                // Tin nhắn thường, Edit, Recall
+                // 1. Xử lý hiển thị tin nhắn lên giao diện (Text, Image, Notification...)
                 chatManager.handleIncomingMessage(msg);
+
+                // --- [PHẦN MỚI CHÈN VÀO] XỬ LÝ SỰ KIỆN NHÓM REALTIME ---
+                if (msg.getContent() != null) {
+
+                    // A. Nếu nhận được thông báo đổi tên hoặc đổi ảnh nhóm
+                    if (msg.getContent().contains("đã đổi tên nhóm") || msg.getContent().contains("đã thay đổi ảnh")) {
+                        // Chạy luồng riêng để gọi Server (tránh đơ giao diện)
+                        new Thread(() -> {
+                            try {
+                                // Gọi Server lấy lại thông tin nhóm mới nhất
+                                UserDTO updatedGroup = RmiClient.getDirectoryService().getUserInfo(msg.getConversationId());
+
+                                // Cập nhật lại Sidebar trên luồng giao diện
+                                if (updatedGroup != null) {
+                                    Platform.runLater(() -> updateFriendInList(updatedGroup));
+                                }
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        }).start();
+                    }
+
+                    // B. Nếu nhận được thông báo giải tán nhóm
+                    if (msg.getContent().contains("đã giải tán nhóm")) {
+                        // Tự động xóa nhóm khỏi danh sách và đóng chat
+                        handleGroupLeft(msg.getConversationId());
+                    }
+                }
+                // -------------------------------------------------------
             }
         });
     }

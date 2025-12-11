@@ -15,7 +15,8 @@ public class MessageDTO implements Serializable {
         CALL_ACCEPT, // Chấp nhận
         CALL_DENY,   // Từ chối
         CALL_END ,    // Kết thúc cuộc gọi
-        EDIT, RECALL // <--- THÊM 2 LOẠI NÀY
+        EDIT, RECALL ,
+        NOTIFICATION// <--- THÊM 2 LOẠI NÀY
     }
 
     private long id;

@@ -16,4 +16,7 @@ public interface ClientCallback extends Remote {
 
     // [MỚI] Hàm báo khi được thêm vào nhóm
     void onAddedToGroup(UserDTO newGroup) throws RemoteException;
+    // --- [THÊM MỚI] ---
+    // Hàm này được Server gọi khi user bị người khác kick khỏi nhóm
+    void onRemovedFromGroup(long groupId, String groupName) throws RemoteException;
 }

@@ -56,4 +56,23 @@ public class RealTimeHandler extends UnicastRemoteObject implements ClientCallba
         // Khi được thêm vào nhóm, gọi hàm này để hiển thị nhóm lên Sidebar ngay lập tức
         Platform.runLater(() -> mainController.updateFriendInList(newGroup));
     }
+    // --- [THÊM MỚI] ---
+    @Override
+    public void onRemovedFromGroup(long groupId, String groupName) throws RemoteException {
+        Platform.runLater(() -> {
+            // 1. Hiện thông báo cho người bị kick biết
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Thông báo");
+            alert.setHeaderText("Bạn đã bị mời ra khỏi nhóm!");
+            alert.setContentText("Bạn không còn là thành viên của nhóm: " + groupName);
+            alert.show();
+
+            // 2. Gọi hàm xử lý giao diện bên MainController
+            // Hàm này sẽ xóa nhóm khỏi List và đóng khung chat nếu đang mở
+            if (mainController != null) {
+                mainController.handleGroupLeft(groupId);
+            }
+        });
+    }
+
 }

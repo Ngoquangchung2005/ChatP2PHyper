@@ -12,6 +12,7 @@ public class UserDTO implements Serializable {
     private boolean isOnline;
     private String lastIp;
     private int lastPort;
+    private boolean isAdmin; // [MỚI]
 
     // --- [MỚI] ---
     private String avatarUrl;   // Đường dẫn ảnh đại diện trên Server
@@ -46,6 +47,9 @@ public class UserDTO implements Serializable {
     public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
     public String getStatusMsg() { return statusMsg; }
     public void setStatusMsg(String statusMsg) { this.statusMsg = statusMsg; }
+    // Getter & Setter
+    public boolean isAdmin() { return isAdmin; }
+    public void setAdmin(boolean admin) { isAdmin = admin; }
 
     @Override
     public String toString() { return displayName; }

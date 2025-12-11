@@ -47,10 +47,17 @@ public class ChatUIHelper {
 
         Node contentNode;
 
-        // Tạo nội dung dựa trên loại tin nhắn
+        // --- [1] TẠO NỘI DUNG DỰA TRÊN LOẠI TIN NHẮN ---
         if (msg.getType() == MessageDTO.MessageType.RECALL) {
             Label lbl = new Label("🚫 Tin nhắn đã thu hồi");
             lbl.setStyle("-fx-font-style: italic; -fx-text-fill: #888888;");
+            contentNode = lbl;
+        }
+        // [MỚI] Xử lý hiển thị thông báo (Notification)
+        else if (msg.getType() == MessageDTO.MessageType.NOTIFICATION) {
+            Label lbl = new Label(msg.getContent());
+            // Style: Chữ xám, nghiêng, nền xám nhạt, bo tròn
+            lbl.setStyle("-fx-text-fill: #888888; -fx-font-size: 12px; -fx-font-style: italic; -fx-padding: 5 10; -fx-background-color: #f0f0f0; -fx-background-radius: 10;");
             contentNode = lbl;
         }
         else if (msg.getType() == MessageDTO.MessageType.TEXT) {
@@ -77,64 +84,91 @@ public class ChatUIHelper {
 
         // Đóng gói nội dung vào bong bóng
         VBox bubble = new VBox(contentNode);
-        bubble.getStyleClass().add(isMe ? "bubble-me" : "bubble-other");
 
-        // --- [THAY ĐỔI LỚN TẠI ĐÂY]: TẠO NÚT 3 CHẤM ---
-
-        // Tạo một HBox để chứa [Nút 3 chấm] và [Bong bóng chat]
-        HBox contentRow = new HBox(5); // Khoảng cách 5px
-        contentRow.setAlignment(isMe ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
-
-        // Chỉ hiện nút 3 chấm nếu là tin nhắn CỦA MÌNH và CHƯA BỊ THU HỒI
-        if (isMe && msg.getType() != MessageDTO.MessageType.RECALL && mainController != null) {
-
-            // 1. Tạo nút 3 chấm
-            Button optionsBtn = new Button("⋮");
-            optionsBtn.getStyleClass().add("btn-msg-options"); // Class CSS vừa thêm
-
-            // 2. Tạo Menu (giống logic cũ)
-            ContextMenu contextMenu = new ContextMenu();
-
-            // Menu: Chỉnh sửa (Chỉ cho tin nhắn văn bản)
-            if (msg.getType() == MessageDTO.MessageType.TEXT) {
-                MenuItem editItem = new MenuItem("✏ Chỉnh sửa");
-                editItem.setOnAction(e -> mainController.handleEditAction(msg));
-                contextMenu.getItems().add(editItem);
-            }
-
-            // Menu: Thu hồi
-            MenuItem recallItem = new MenuItem("🚫 Thu hồi");
-            recallItem.setOnAction(e -> mainController.handleRecallAction(msg));
-            contextMenu.getItems().add(recallItem);
-
-            // 3. Sự kiện bấm nút 3 chấm -> Hiện menu
-            optionsBtn.setOnAction(e -> {
-                contextMenu.show(optionsBtn, javafx.geometry.Side.BOTTOM, 0, 0);
-            });
-
-            // 4. Thêm vào row: [Nút 3 chấm] [Bong bóng]
-            // Vì alignment là CENTER_RIGHT, thứ tự addAll(optionsBtn, bubble) sẽ hiển thị là:
-            // [Nút 3 chấm] [Bong bóng] | (Lề phải)
-            contentRow.getChildren().addAll(optionsBtn, bubble);
+        // [MỚI] Chỉ thêm class bong bóng chat nếu KHÔNG PHẢI là thông báo
+        if (msg.getType() != MessageDTO.MessageType.NOTIFICATION) {
+            bubble.getStyleClass().add(isMe ? "bubble-me" : "bubble-other");
         } else {
-            // Tin nhắn người khác hoặc đã thu hồi -> Chỉ hiện bong bóng
-            contentRow.getChildren().add(bubble);
+            // Căn giữa nội dung bên trong bong bóng thông báo
+            bubble.setAlignment(Pos.CENTER);
         }
 
-        // Đóng gói vào layout hàng ngang tổng thể (Row chính của listview)
-        VBox messageBlock = new VBox(3);
-        messageBlock.setAlignment(isMe ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
-        messageBlock.getChildren().add(contentRow); // Add contentRow thay vì bubble trực tiếp
+        // --- [2] TẠO HÀNG CHỨA (NÚT 3 CHẤM + BONG BÓNG) ---
+        HBox contentRow = new HBox(5); // Khoảng cách 5px
 
-        // Hiển thị thời gian
+        // [MỚI] Nếu là Notification thì CĂN GIỮA, ngược lại thì theo isMe
+        if (msg.getType() == MessageDTO.MessageType.NOTIFICATION) {
+            contentRow.setAlignment(Pos.CENTER);
+            contentRow.getChildren().add(bubble);
+        }
+        else {
+            // --- LOGIC CŨ CHO TIN NHẮN CHAT ---
+            contentRow.setAlignment(isMe ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
+
+            // Chỉ hiện nút 3 chấm nếu là tin nhắn CỦA MÌNH và CHƯA BỊ THU HỒI
+            if (isMe && msg.getType() != MessageDTO.MessageType.RECALL && mainController != null) {
+
+                // 1. Tạo nút 3 chấm
+                Button optionsBtn = new Button("⋮");
+                optionsBtn.getStyleClass().add("btn-msg-options");
+
+                // 2. Tạo Menu
+                ContextMenu contextMenu = new ContextMenu();
+
+                // Menu: Chỉnh sửa (Chỉ cho tin nhắn văn bản)
+                if (msg.getType() == MessageDTO.MessageType.TEXT) {
+                    MenuItem editItem = new MenuItem("✏ Chỉnh sửa");
+                    editItem.setOnAction(e -> mainController.handleEditAction(msg));
+                    contextMenu.getItems().add(editItem);
+                }
+
+                // Menu: Thu hồi
+                MenuItem recallItem = new MenuItem("🚫 Thu hồi");
+                recallItem.setOnAction(e -> mainController.handleRecallAction(msg));
+                contextMenu.getItems().add(recallItem);
+
+                // 3. Sự kiện bấm nút 3 chấm -> Hiện menu
+                optionsBtn.setOnAction(e -> {
+                    contextMenu.show(optionsBtn, javafx.geometry.Side.BOTTOM, 0, 0);
+                });
+
+                // 4. Thêm vào row: [Nút 3 chấm] [Bong bóng]
+                contentRow.getChildren().addAll(optionsBtn, bubble);
+            } else {
+                // Tin nhắn người khác hoặc đã thu hồi -> Chỉ hiện bong bóng
+                contentRow.getChildren().add(bubble);
+            }
+        }
+
+        // --- [3] ĐÓNG GÓI VÀO KHỐI BLOCK (CHỨA CẢ THỜI GIAN) ---
+        VBox messageBlock = new VBox(3);
+
+        // [MỚI] Căn chỉnh block tổng thể
+        if (msg.getType() == MessageDTO.MessageType.NOTIFICATION) {
+            messageBlock.setAlignment(Pos.CENTER);
+        } else {
+            messageBlock.setAlignment(isMe ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
+        }
+
+        messageBlock.getChildren().add(contentRow);
+
+        // Hiển thị thời gian (Notification cũng có thời gian, nhưng sẽ được căn giữa theo block)
         if (msg.getCreatedAt() != null) {
             Label timeLbl = new Label(msg.getCreatedAt().format(DateTimeFormatter.ofPattern("HH:mm")));
             timeLbl.getStyleClass().add("time-label");
             messageBlock.getChildren().add(timeLbl);
         }
 
+        // --- [4] TẠO HÀNG CUỐI CÙNG ADD VÀO CONTAINER ---
         HBox row = new HBox();
-        row.setAlignment(isMe ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
+
+        // [MỚI] Căn chỉnh hàng trong ListView
+        if (msg.getType() == MessageDTO.MessageType.NOTIFICATION) {
+            row.setAlignment(Pos.CENTER);
+        } else {
+            row.setAlignment(isMe ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
+        }
+
         row.setPadding(new Insets(2, 10, 2, 10));
         row.getChildren().add(messageBlock);
 
@@ -146,9 +180,8 @@ public class ChatUIHelper {
             msgScrollPane.setVvalue(1.0);
         });
 
-        return bubble; // Vẫn trả về bubble để MainController quản lý việc update nội dung sau này
+        return bubble;
     }
-
     public static void updateBubbleContent(VBox bubble, String newContent, boolean isRecall) {
         Platform.runLater(() -> {
             bubble.getChildren().clear();
