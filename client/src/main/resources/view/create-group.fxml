@@ -1,25 +1,37 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
-<?import javafx.geometry.Insets?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.shape.Circle?>
 <?import javafx.scene.text.Font?>
 
-<VBox spacing="10" alignment="CENTER" xmlns="http://javafx.com/javafx/21"
+<VBox spacing="15" alignment="TOP_CENTER" xmlns="http://javafx.com/javafx/21"
       xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.example.client.controller.CreateGroupController"
-      style="-fx-background-color: white; -fx-padding: 20;">
+      style="-fx-background-color: white; -fx-padding: 20;" prefWidth="350" prefHeight="500">
 
     <Label text="Tạo Nhóm Mới" textFill="#0084ff">
-        <font><Font name="Segoe UI Bold" size="18"/></font>
+        <font><Font name="Segoe UI Bold" size="20"/></font>
     </Label>
 
-    <TextField fx:id="groupNameField" promptText="Đặt tên nhóm..." />
+    <StackPane onMouseClicked="#handleChooseImage" style="-fx-cursor: hand;">
+        <Circle fill="#e0e0e0" radius="40.0" />
+        <ImageView fx:id="groupAvatarView" fitHeight="80.0" fitWidth="80.0" pickOnBounds="true" preserveRatio="false">
+            <clip><Circle centerX="40" centerY="40" radius="40" /></clip>
+        </ImageView>
+        <Label text="📷" textFill="gray" style="-fx-font-size: 20px;" mouseTransparent="true"/>
+        <Label text="Chọn ảnh" textFill="#666" style="-fx-font-size: 10px;" translateY="50"/>
+    </StackPane>
 
-    <Label text="Chọn thành viên:" alignment="CENTER_LEFT" maxWidth="Infinity"/>
-    <ListView fx:id="friendCheckList" VBox.vgrow="ALWAYS" prefHeight="200"/>
+    <TextField fx:id="groupNameField" promptText="Đặt tên nhóm..." style="-fx-background-radius: 10; -fx-padding: 10;" />
+
+    <Label text="Chọn thành viên:" alignment="CENTER_LEFT" maxWidth="Infinity" style="-fx-font-weight: bold;"/>
+
+    <ListView fx:id="friendCheckList" VBox.vgrow="ALWAYS" />
 
     <HBox spacing="10" alignment="CENTER_RIGHT">
-        <Button text="Hủy" onAction="#handleCancel"/>
-        <Button text="Tạo" onAction="#handleCreate" style="-fx-background-color: #0084ff; -fx-text-fill: white;"/>
+        <Button text="Hủy" onAction="#handleCancel" style="-fx-background-color: #f0f2f5; -fx-cursor: hand;"/>
+        <Button text="Tạo Nhóm" onAction="#handleCreate" defaultButton="true"
+                style="-fx-background-color: #0084ff; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand;"/>
     </HBox>
 </VBox>

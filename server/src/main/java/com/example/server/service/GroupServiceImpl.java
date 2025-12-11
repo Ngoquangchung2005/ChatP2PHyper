@@ -17,31 +17,33 @@ public class GroupServiceImpl extends UnicastRemoteObject implements GroupServic
     }
 
     @Override
-    public long createGroup(String groupName, List<Long> memberIds) throws RemoteException {
+    public long createGroup(String groupName, List<Long> memberIds, String avatarUrl) throws RemoteException {
         long conversationId = 0;
         Connection conn = null;
         try {
             conn = Database.getConnection();
             conn.setAutoCommit(false);
 
-            // 1. Tạo Conversation
-            String sqlConv = "INSERT INTO conversations (name, is_group, created_at) VALUES (?, TRUE, NOW())";
+            // 1. Tạo Conversation (Đã thêm avatar_url)
+            String sqlConv = "INSERT INTO conversations (name, is_group, created_at, avatar_url) VALUES (?, TRUE, NOW(), ?)";
             try (PreparedStatement ps = conn.prepareStatement(sqlConv, Statement.RETURN_GENERATED_KEYS)) {
                 ps.setString(1, groupName);
+                // Nếu avatarUrl null thì set NULL, ngược lại set String
+                ps.setString(2, avatarUrl);
+
                 ps.executeUpdate();
                 try (ResultSet rs = ps.getGeneratedKeys()) {
                     if (rs.next()) conversationId = rs.getLong(1);
                 }
             }
 
-            // 2. Thêm thành viên
+            // 2. Thêm thành viên (Giữ nguyên logic cũ)
             String sqlMem = "INSERT INTO conversation_members (conversation_id, user_id, is_admin) VALUES (?, ?, ?)";
             try (PreparedStatement ps = conn.prepareStatement(sqlMem)) {
                 for (Long userId : memberIds) {
                     ps.setLong(1, conversationId);
                     ps.setLong(2, userId);
-                    // Người đầu tiên trong list (người tạo) là Admin (Logic client gửi id người tạo đầu tiên)
-                    // Hoặc kiểm tra: nếu userId == memberIds.get(0) -> true
+                    // Người tạo (người đầu tiên trong list) là Admin
                     boolean isAdmin = (userId.equals(memberIds.get(0)));
                     ps.setBoolean(3, isAdmin);
                     ps.addBatch();
@@ -50,9 +52,9 @@ public class GroupServiceImpl extends UnicastRemoteObject implements GroupServic
             }
             conn.commit();
 
-            // 3. [MỚI] THÔNG BÁO REAL-TIME CHO CÁC THÀNH VIÊN
+            // 3. Thông báo Real-time (Sửa lại để truyền cả avatar mới)
             if (conversationId > 0) {
-                notifyGroupMembers(conversationId, groupName, memberIds);
+                notifyGroupMembers(conversationId, groupName, avatarUrl, memberIds);
             }
 
             return conversationId;
@@ -65,26 +67,22 @@ public class GroupServiceImpl extends UnicastRemoteObject implements GroupServic
         }
     }
 
-    // --- HÀM BẮN THÔNG BÁO ---
-    private void notifyGroupMembers(long groupId, String groupName, List<Long> memberIds) {
-        // Tạo đối tượng Group (giả lập UserDTO như logic cũ) để hiển thị lên List
+    // [SỬA] Hàm notify nhận thêm avatarUrl
+    private void notifyGroupMembers(long groupId, String groupName, String avatarUrl, List<Long> memberIds) {
         UserDTO groupDTO = new UserDTO();
         groupDTO.setId(groupId);
         groupDTO.setDisplayName("[Nhóm] " + groupName);
         groupDTO.setUsername("GROUP");
         groupDTO.setOnline(true);
+        groupDTO.setAvatarUrl(avatarUrl); // Set avatar cho thông báo realtime
 
-        // Duyệt qua từng thành viên
         for (Long userId : memberIds) {
-            // Lấy callback của người đó từ AuthServiceImpl
             ClientCallback cb = AuthServiceImpl.getClientCallback(userId);
             if (cb != null) {
                 new Thread(() -> {
                     try {
                         cb.onAddedToGroup(groupDTO);
-                    } catch (RemoteException e) {
-                        e.printStackTrace();
-                    }
+                    } catch (RemoteException e) { e.printStackTrace(); }
                 }).start();
             }
         }
@@ -152,7 +150,8 @@ public class GroupServiceImpl extends UnicastRemoteObject implements GroupServic
     @Override
     public List<UserDTO> getGroupMembers(long groupId) throws RemoteException {
         List<UserDTO> members = new ArrayList<>();
-        String sql = "SELECT u.id, u.username, u.display_name, u.avatar_url, u.is_online " +
+        // Đảm bảo câu lệnh SQL đúng chính tả tên bảng và cột
+        String sql = "SELECT u.id, u.username, u.display_name, u.avatar_url, u.is_online, cm.is_admin " +
                 "FROM users u " +
                 "JOIN conversation_members cm ON u.id = cm.user_id " +
                 "WHERE cm.conversation_id = ?";

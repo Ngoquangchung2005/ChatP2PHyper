@@ -6,9 +6,8 @@ import java.rmi.RemoteException;
 import java.util.List;
 
 public interface GroupService extends Remote {
-    // Tạo nhóm mới
-    long createGroup(String groupName, List<Long> memberIds) throws RemoteException;
-
+    // [SỬA] Thêm tham số avatarUrl
+    long createGroup(String groupName, List<Long> memberIds, String avatarUrl) throws RemoteException;
     // Lấy danh sách ID thành viên (để Client gửi P2P)
     List<Long> getGroupMemberIds(long conversationId) throws RemoteException;
 

@@ -54,8 +54,8 @@ public class FriendServiceImpl extends UnicastRemoteObject implements FriendServ
             e.printStackTrace();
         }
 
-        // B. LẤY NHÓM CHAT MÀ USER THAM GIA
-        String sqlGroups = "SELECT c.id, c.name FROM conversations c " +
+        // [SỬA LỖI] Thêm c.avatar_url vào câu SELECT
+        String sqlGroups = "SELECT c.id, c.name, c.avatar_url FROM conversations c " +
                 "JOIN conversation_members cm ON c.id = cm.conversation_id " +
                 "WHERE cm.user_id = ? AND c.is_group = TRUE";
         try (Connection conn = Database.getConnection();
@@ -68,6 +68,8 @@ public class FriendServiceImpl extends UnicastRemoteObject implements FriendServ
                 group.setDisplayName("[Nhóm] " + rs.getString("name"));
                 group.setUsername("GROUP"); // Đánh dấu là nhóm
                 group.setOnline(true);
+                // [THÊM DÒNG NÀY] Set Avatar cho nhóm
+                group.setAvatarUrl(rs.getString("avatar_url"));
                 list.add(group);
             }
         } catch (SQLException e) {
